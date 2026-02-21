@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camp Hub Pro | Master v2.4</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f1f5f9; --white: #fff; --border: #e2e8f0; --red: #ef4444; --green: #10b981; --amber: #f59e0b; --gray-kpi: #94a3b8; }
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; color: #1e293b; }
+        
+        .sidebar { background: var(--primary); color: white; padding: 10px; display: flex; flex-direction: row; gap: 8px; overflow-x: auto; flex-shrink: 0; }
+        .nav-btn { padding: 10px 16px; border: none; background: rgba(255,255,255,0.1); color: #cbd5e1; cursor: pointer; border-radius: 8px; font-weight: 600; white-space: nowrap; font-size: 13px; }
+        .nav-btn.active { background: var(--accent); color: white; }
+        @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 240px; flex-direction: column; height: 100vh; padding: 20px; } .nav-btn { width: 100%; text-align: left; margin-bottom: 5px; } }
+
+        .content { flex: 1; padding: 20px; overflow-y: auto; }
+        .panel { display: none; max-width: 1200px; margin: 0 auto; }
+        .panel.active { display: block; }
+        .card { background: var(--white); border: 1px solid var(--border); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        @media (min-width: 600px) { .grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); } }
+        
+        label { display: block; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: #fff; }
+        
+        .btn { padding: 8px 12px; border-radius: 6px; border: none; font-weight: 700; cursor: pointer; font-size: 11px; transition: 0.2s; }
+        .btn-add { background: var(--accent); color: white; width: 100%; font-size: 13px; padding: 12px; }
+        .btn-upd { background: var(--green); color: white; width: 100%; font-size: 13px; padding: 12px; }
+        .btn-edit { background: #fef3c7; color: var(--amber); margin-right: 5px; }
+        .btn-del { background: #fee2e2; color: var(--red); }
+        
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); margin-top: 10px; }
+        th { text-align: left; padding: 12px; background: #f8fafc; font-size: 11px; color: #64748b; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .kpi-badge { background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        .threshold-pill { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: white; }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <h3 style="margin: 0 0 15px 10px; font-size: 18px;">CAMP HUB PRO</h3>
+    <button class="nav-btn active" onclick="showPanel('insight', this)">Insight</button>
+    <button class="nav-btn" onclick="showPanel('update', this)">Daily Entry</button>
+    <button class="nav-btn" onclick="showPanel('kpi-data', this)">KPI Performance</button>
+    <button class="nav-btn" onclick="showPanel('manage', this)">Facility Setup</button>
+    <button class="nav-btn" onclick="showPanel('kpi-panel', this)">KPI Assignment</button>
+    <button class="nav-btn" onclick="showPanel('settings', this)">Admin Base</button>
+</nav>
+
+<main class="content">
+
+    <section id="insight" class="panel active">
+        <input type="text" id="f-insight" placeholder="Search Master View..." onkeyup="renderInsight()" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+        <table><thead><tr><th>Site</th><th>Facility</th><th>Contractor</th><th>Specs</th></tr></thead><tbody id="insight-body"></tbody></table>
+    </section>
+
+    <section id="update" class="panel">
+        <div class="card">
+            <h4 id="entry-title">Post Daily Log</h4>
+            <input type="hidden" id="entry-id">
+            <div class="grid">
+                <div><label>Site</label><select id="entry-loc" onchange="syncEntryFacs()"></select></div>
+                <div><label>Facility</label><select id="entry-map" onchange="toggleEntryUI()"></select></div>
+            </div>
+            <div id="form-area" style="display:none; margin-top:20px; border-top:1px solid #eee; padding-top:20px;">
+                <div id="ui-acc" class="grid" style="display:none">
+                    <div><label>Rooms</label><input type="number" id="in-rm" readonly></div>
+                    <div><label>Occupied</label><input type="number" id="in-oc"></div>
+                    <div><label>Mandays</label><input type="number" id="in-md"></div>
+                </div>
+                <div id="ui-plant" class="grid" style="display:none">
+                    <div><label>Cap (m³)</label><input type="number" id="in-cap" readonly></div>
+                    <div><label>Received</label><input type="number" id="in-rec"></div>
+                    <div><label>Treated</label><input type="number" id="in-tr"></div>
+                </div>
+                <button id="entry-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveDailyEntry()">Post Daily Record</button>
+            </div>
+        </div>
+        <div id="log-filter-bar" style="margin: 15px 0; display: flex; align-items: center; gap: 12px; overflow-x: auto; padding-bottom: 5px;">
+    <span style="font-size: 11px; font-weight: 800; color: var(--gray-kpi); text-transform: uppercase; white-space: nowrap;">Quick Filter:</span>
+    <div id="filter-chips" style="display: flex; gap: 8px;"></div>
+</div>
+</div>
+<table>
+    <thead><tr><th>Date</th><th>Facility</th><th>Data Log</th><th>Action</th></tr></thead>
+    <tbody id="entry-body"></tbody>
+</table>
+    </section>
+
+    <section id="kpi-data" class="panel">
+        <div class="card">
+            <h4 id="perf-title">Record KPI Performance</h4>
+            <input type="hidden" id="perf-id">
+            <div class="grid">
+                <div><label>Site</label><select id="perf-loc" onchange="syncPerfCons()"></select></div>
+                <div><label>Contractor</label><select id="perf-con" onchange="syncPerfCodes()"></select></div>
+                <div><label>KPI Code</label><select id="perf-code"></select></div>
+                <div><label>Date</label><input type="date" id="perf-date"></div>
+                <div><label>Result Value</label><input type="number" step="0.01" id="perf-val"></div>
+            </div>
+            <button id="perf-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveKPIPerformance()">Submit Record</button>
+        </div>
+        <table><thead><tr><th>Date</th><th>Site</th><th>Contractor</th><th>Code</th><th>Value</th><th>Action</th></tr></thead><tbody id="perf-body"></tbody></table>
+    </section>
+
+    <section id="manage" class="panel">
+        <div class="card">
+            <h4 id="setup-title">Establish New Mapping</h4>
+            <input type="hidden" id="setup-id">
+            <div class="grid">
+                <div><label>Site</label><select id="set-loc"></select></div>
+                <div><label>Type</label><select id="set-fac" onchange="toggleSetupFields()"></select></div>
+                <div><label>Contractor</label><select id="set-con"></select></div>
+                <div><label>Prefix</label><input type="text" id="set-pre"></div>
+            </div>
+            <div id="setup-acc" class="grid" style="margin-top:10px;">
+                <div><label>Blocks</label><input type="number" id="set-bl"></div>
+                <div><label>Rooms</label><input type="number" id="set-rm"></div>
+            </div>
+            <div id="setup-plant" class="grid" style="margin-top:10px; display:none;">
+                <div><label>Units</label><input type="number" id="set-units"></div>
+                <div><label>Max Cap</label><input type="number" id="set-cap"></div>
+            </div>
+            <button id="setup-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveSetup()">Create Assignment</button>
+        </div>
+        <table><thead><tr><th>Site</th><th>Facility</th><th>Contractor</th><th>Action</th></tr></thead><tbody id="manage-body"></tbody></table>
+    </section>
+
+    <section id="kpi-panel" class="panel">
+        <div class="card">
+            <h4 id="kpi-title">Link KPI Assignment</h4>
+            <input type="hidden" id="kpi-id">
+            <div class="grid">
+                <div><label>Site</label><select id="kpi-loc"></select></div>
+                <div><label>Contractor</label><select id="kpi-con"></select></div>
+                <div><label>KPI Code</label><input type="text" id="kpi-manual-code"></div>
+            </div>
+            <div class="grid" style="margin-top:15px; padding-top:15px; border-top:1px dashed #cbd5e1;">
+                <div><label style="color:var(--green)">Target (Green) ≥</label><input type="number" step="0.01" id="kpi-green" placeholder="e.g. 95"></div>
+                <div><label style="color:var(--amber)">Warning (Gray) ≥</label><input type="number" step="0.01" id="kpi-gray" placeholder="e.g. 90"></div>
+            </div>
+            <button id="kpi-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveKPIAssignment()">Link KPI & Set Thresholds</button>
+        </div>
+        <table><thead><tr><th>Site</th><th>Contractor</th><th>Code</th><th>Thresholds</th><th>Action</th></tr></thead><tbody id="kpi-body"></tbody></table>
+    </section>
+
+    <section id="settings" class="panel">
+        <div class="grid">
+            <div class="card"><label>New Location</label><div style="display:flex; gap:5px;"><input type="text" id="b-loc"><button onclick="addBase('locations','name','b-loc')" class="btn btn-add" style="width:40px">+</button></div><div id="l-list"></div></div>
+            <div class="card"><label>New Contractor</label><div style="display:flex; gap:5px;"><input type="text" id="b-con"><button onclick="addBase('contractors','name','b-con')" class="btn btn-add" style="width:40px">+</button></div><div id="c-list"></div></div>
+            <div class="card"><label>New Fac Type</label><div style="display:flex; gap:5px;"><input type="text" id="b-fac"><button onclick="addBase('facilities','facility_type','b-fac')" class="btn btn-add" style="width:40px">+</button></div><div id="f-list"></div></div>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    let ACTIVE_LOG_FILTER = 'ALL';
+    const SB_URL = 'https://lkufyubfipdaxbjdyodg.supabase.co'; 
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxrdWZ5dWJmaXBkYXhiamR5b2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNTE5MDIsImV4cCI6MjA4NTYyNzkwMn0.2wUNKYNnoAz4zguIhHAAFfqnzVeZWEDEteKsNxFcYa8';
+    const db = supabase.createClient(SB_URL, SB_KEY);
+    let CACHE = { locs:[], types:[], cons:[], mapping:[], kpis:[], performance:[], logs:[] };
+
+    window.onload = () => init();
+
+    async function init() {
+    const [l, t, c, m, k, p, d] = await Promise.all([
+        db.from('locations').select('*').order('name'),
+        db.from('facilities').select('*').order('facility_type'),
+        db.from('contractors').select('*').order('name'),
+        db.from('facility_locations').select('*, locations(name), facilities(facility_type), contractors(name)'),
+        db.from('contractor_kpis').select('*, locations(name), contractors(name)'),
+        db.from('kpi_performance').select('*, contractor_kpis(*), contractors(name), locations(name)').order('entry_date', {ascending:false}),
+        db.from('facility_data').select('*').order('updated_at', {ascending:false})
+    ]);
+
+    // Force strict assignment to the cache
+    CACHE.locs = l.data || [];
+    CACHE.types = t.data || [];
+    CACHE.cons = c.data || [];
+    CACHE.mapping = m.data || [];
+    CACHE.kpis = k.data || [];
+    CACHE.performance = p.data || [];
+    CACHE.logs = d.data || []; // This is where your JSON row goes
+
+    renderAll();
+}
+
+
+    function renderAll() {
+    renderInsight(); 
+    populateDrops(); 
+    renderPerfTable(); 
+    renderManage(); 
+    renderKpiAssignments(); 
+    renderBase();
+    
+    // These two ensure the table loads "All" by default on start
+    renderLogFilters(); 
+    renderEntryTable();
+}
+
+    /* --- LOGIC: INSIGHT --- */
+    function renderInsight() {
+        const f = document.getElementById('f-insight').value.toLowerCase();
+        document.getElementById('insight-body').innerHTML = CACHE.mapping.filter(m => m.locations?.name.toLowerCase().includes(f)).map(m => `<tr><td>${m.locations?.name}</td><td>${m.prefix_name} ${m.facilities?.facility_type}</td><td>${m.contractors?.name || '-'}</td><td>${m.total_rooms || m.max_capacity}</td></tr>`).join('');
+    }
+
+    /* --- LOGIC: DAILY ENTRY --- */
+    function syncEntryFacs() {
+        const lid = document.getElementById('entry-loc').value;
+        const filtered = CACHE.mapping.filter(m => m.location_id === lid);
+        document.getElementById('entry-map').innerHTML = '<option value="">Select Facility</option>' + filtered.map(m => `<option value="${m.id}">${m.prefix_name} ${m.facilities.facility_type}</option>`).join('');
+    }
+    function toggleEntryUI() {
+        const m = CACHE.mapping.find(x => x.id == document.getElementById('entry-map').value);
+        if(!m) return;
+        const isP = m.facilities.facility_type.toUpperCase().match(/STP|RO/);
+        document.getElementById('form-area').style.display = 'block';
+        document.getElementById('ui-acc').style.display = isP?'none':'grid';
+        document.getElementById('ui-plant').style.display = isP?'grid':'none';
+        if(isP) document.getElementById('in-cap').value = m.max_capacity; else document.getElementById('in-rm').value = m.total_rooms;
+    }
+    async function saveDailyEntry() {
+        const id = document.getElementById('entry-id').value;
+        const mid = document.getElementById('entry-map').value;
+        const m = CACHE.mapping.find(x => x.id == mid);
+        const data = { fac_loc_id: mid };
+        if(m.facilities.facility_type.toUpperCase().match(/STP|RO/)) { 
+            data.water_rec = parseFloat(document.getElementById('in-rec').value); 
+            data.water_treat = parseFloat(document.getElementById('in-tr').value); 
+            data.occ_rooms = null; data.mandays = null;
+        } else { 
+            data.occ_rooms = parseInt(document.getElementById('in-oc').value); 
+            data.mandays = parseInt(document.getElementById('in-md').value); 
+            data.water_rec = null; data.water_treat = null;
+        }
+        const { error } = id ? await db.from('facility_data').update(data).eq('id', id) : await db.from('facility_data').insert([data]);
+        if(!error) { resetForm('entry'); init(); } else alert(error.message);
+    }
+    function editEntry(id) {
+        const l = CACHE.logs.find(x => x.id === id);
+        const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+        document.getElementById('entry-id').value = l.id;
+        document.getElementById('entry-loc').value = m.location_id;
+        syncEntryFacs();
+        document.getElementById('entry-map').value = l.fac_loc_id;
+        toggleEntryUI();
+        if(l.water_rec !== null) { document.getElementById('in-rec').value = l.water_rec; document.getElementById('in-tr').value = l.water_treat; }
+        else { document.getElementById('in-oc').value = l.occ_rooms; document.getElementById('in-md').value = l.mandays; }
+        setMode('entry', 'upd');
+    }
+    function renderEntryTable() {
+    const tbody = document.getElementById('entry-body');
+    if (!tbody) return;
+
+    // Filter the logs based on the active selection
+    const filteredLogs = CACHE.logs.filter(l => {
+        if (ACTIVE_LOG_FILTER === 'ALL') return true;
+        const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+        return m?.locations?.name === ACTIVE_LOG_FILTER;
+    });
+
+    if (filteredLogs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No logs found for this selection.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filteredLogs.map(l => {
+        const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+        const occ = parseInt(l.occ_rooms) || 0;
+        let detail = (occ > 0) ? `<span style="color:var(--green)">Acc:</span> Occ ${l.occ_rooms} | MD ${l.mandays}` : `<span style="color:var(--accent)">Water:</span> Rec ${l.water_rec} | Tr ${l.water_treat}`;
+        const site = m?.locations?.name || "Unknown";
+        const fac = m ? `${m.prefix_name} ${m.facilities?.facility_type}` : "Unmapped";
+        const date = l.updated_at ? new Date(l.updated_at).toLocaleDateString() : 'N/A';
+
+        return `<tr>
+            <td>${date}</td>
+            <td><strong>${site}</strong><br><small>${fac}</small></td>
+            <td>${detail}</td>
+            <td>
+                <button class="btn btn-edit" onclick="editEntry('${l.id}')">Edit</button>
+                <button class="btn btn-del" onclick="delItem('facility_data','${l.id}')">×</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function renderLogFilters() {
+    const container = document.getElementById('filter-chips');
+    if (!container) return;
+
+    // Calculate counts based on current CACHE.logs
+    const counts = {};
+    let total = 0;
+
+    CACHE.logs.forEach(log => {
+        const m = CACHE.mapping.find(x => x.id === log.fac_loc_id);
+        const locName = m?.locations?.name || "Unknown";
+        counts[locName] = (counts[locName] || 0) + 1;
+        total++;
+    });
+
+    // Generate HTML for 'ALL'
+    let html = `
+        <button class="btn" 
+            style="background:${ACTIVE_LOG_FILTER === 'ALL' ? 'var(--primary)' : '#fff'}; 
+                   color:${ACTIVE_LOG_FILTER === 'ALL' ? '#fff' : 'var(--primary)'}; 
+                   border: 1px solid var(--primary); white-space:nowrap;" 
+            onclick="setLogFilter('ALL')">
+            All (${total})
+        </button>`;
+
+    // Generate HTML for locations that have data
+    Object.keys(counts).sort().forEach(loc => {
+        const isActive = ACTIVE_LOG_FILTER === loc;
+        html += `
+            <button class="btn" 
+                style="background:${isActive ? 'var(--accent)' : '#fff'}; 
+                       color:${isActive ? '#fff' : '#64748b'}; 
+                       border: 1px solid ${isActive ? 'var(--accent)' : '#e2e8f0'}; white-space:nowrap;" 
+                onclick="setLogFilter('${loc}')">
+                ${loc} <span style="font-size:10px; margin-left:4px; opacity:0.8;">${counts[loc]}</span>
+            </button>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// 3. The Filter Action
+function setLogFilter(loc) {
+    ACTIVE_LOG_FILTER = loc;
+    renderLogFilters(); // Redraw buttons to update colors
+    renderEntryTable(); // Redraw table to show filtered data
+}
+
+
+    /* --- LOGIC: KPI PERFORMANCE --- */
+    async function saveKPIPerformance() {
+        const id = document.getElementById('perf-id').value;
+        const data = {
+            location_id: document.getElementById('perf-loc').value,
+            kpi_assignment_id: document.getElementById('perf-code').value,
+            contractor_id: document.getElementById('perf-con').value,
+            entry_date: document.getElementById('perf-date').value,
+            actual_value: parseFloat(document.getElementById('perf-val').value)
+        };
+        const { error } = id ? await db.from('kpi_performance').update(data).eq('id', id) : await db.from('kpi_performance').insert([data]);
+        if(!error) { resetForm('perf'); init(); } else alert(error.message);
+    }
+    function editPerf(id) {
+        const p = CACHE.performance.find(x => x.id === id);
+        document.getElementById('perf-id').value = p.id;
+        document.getElementById('perf-loc').value = p.location_id || p.contractor_kpis?.location_id;
+        syncPerfCons(); document.getElementById('perf-con').value = p.contractor_id;
+        syncPerfCodes(); document.getElementById('perf-code').value = p.kpi_assignment_id;
+        document.getElementById('perf-date').value = p.entry_date;
+        document.getElementById('perf-val').value = p.actual_value;
+        setMode('perf', 'upd');
+    }
+    function renderPerfTable() {
+        document.getElementById('perf-body').innerHTML = CACHE.performance.map(p => {
+            const k = p.contractor_kpis;
+            let color = 'inherit';
+            if (k && k.green_threshold) {
+                if (p.actual_value >= k.green_threshold) color = 'var(--green)';
+                else if (p.actual_value >= k.gray_threshold) color = 'var(--gray-kpi)';
+                else color = 'var(--red)';
+            }
+            return `<tr><td>${p.entry_date}</td><td>${p.locations?.name || 'N/A'}</td><td>${p.contractors?.name}</td><td><span class="kpi-badge">${k?.kpi_code}</span></td><td style="color:${color}; font-weight:bold">${p.actual_value}</td><td><button class="btn btn-edit" onclick="editPerf('${p.id}')">Edit</button><button class="btn btn-del" onclick="delItem('kpi_performance','${p.id}')">×</button></td></tr>`;
+        }).join('');
+    }
+
+    /* --- LOGIC: SETUP & KPI ASSIGN --- */
+    async function saveSetup() {
+    const id = document.getElementById('setup-id').value;
+    const locId = document.getElementById('set-loc').value;
+    const facId = document.getElementById('set-fac').value;
+    const conId = document.getElementById('set-con').value;
+    
+    const selectedFac = CACHE.types.find(f => f.id === facId);
+    const isAcc = selectedFac?.facility_type.toUpperCase().includes("ACCOMMODATION");
+
+    // VALIDATION LOGIC
+    if (!locId || !facId) {
+        alert("Please select a Site and Facility Type.");
+        return;
+    }
+
+    // If it's NOT accommodation, contractor is mandatory
+    if (!isAcc && !conId) {
+        alert("Contractor selection is required for this facility type.");
+        return;
+    }
+
+    const data = {
+        location_id: locId,
+        facility_id: facId,
+        contractor_id: conId || null, // Stores null if empty and isAcc
+        prefix_name: document.getElementById('set-pre').value,
+        num_blocks: parseInt(document.getElementById('set-bl').value) || 0,
+        total_rooms: parseInt(document.getElementById('set-rm').value) || 0,
+        max_capacity: parseInt(document.getElementById('set-cap').value) || 0
+    };
+
+    const { error } = id 
+        ? await db.from('facility_locations').update(data).eq('id', id) 
+        : await db.from('facility_locations').insert([data]);
+
+    if (!error) { 
+        resetForm('setup'); 
+        init(); 
+    } else { 
+        alert(error.message); 
+    }
+}
+
+function resetForm(p) { 
+    if(document.getElementById(p + '-id')) document.getElementById(p + '-id').value = ""; 
+    
+    // Reset dropdowns to the placeholder index
+    if(p === 'setup') {
+        document.getElementById('set-loc').selectedIndex = 0;
+        document.getElementById('set-fac').selectedIndex = 0;
+        document.getElementById('set-con').selectedIndex = 0;
+        document.getElementById('set-pre').value = "";
+        document.getElementById('set-bl').value = "";
+        document.getElementById('set-rm').value = "";
+        document.getElementById('set-cap').value = "";
+    }
+    
+    setMode(p, 'add'); 
+}
+
+
+
+    function renderManage() {
+    document.getElementById('manage-body').innerHTML = CACHE.mapping.map(m => {
+        const contractorDisplay = m.contractors?.name ? m.contractors.name : '<span style="color:#94a3b8; font-style:italic;">Internal</span>';
+        
+        return `<tr>
+            <td>${m.locations?.name}</td>
+            <td>${m.prefix_name} ${m.facilities?.facility_type}</td>
+            <td>${contractorDisplay}</td>
+            <td>
+                <button class="btn btn-edit" onclick="editSetup('${m.id}')">Edit</button>
+                <button class="btn btn-del" onclick="delItem('facility_locations','${m.id}')">×</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+    function editSetup(id) {
+        const m = CACHE.mapping.find(x => x.id === id);
+        document.getElementById('setup-id').value = m.id; document.getElementById('set-loc').value = m.location_id; document.getElementById('set-fac').value = m.facility_id;
+        document.getElementById('set-con').value = m.contractor_id; document.getElementById('set-pre').value = m.prefix_name; toggleSetupFields();
+        document.getElementById('set-bl').value = m.num_blocks; document.getElementById('set-rm').value = m.total_rooms; document.getElementById('set-cap').value = m.max_capacity; setMode('setup', 'upd');
+    }
+    async function saveKPIAssignment() {
+        const id = document.getElementById('kpi-id').value;
+        const data = { location_id: document.getElementById('kpi-loc').value, contractor_id: document.getElementById('kpi-con').value, kpi_code: document.getElementById('kpi-manual-code').value, green_threshold: parseFloat(document.getElementById('kpi-green').value) || 0, gray_threshold: parseFloat(document.getElementById('kpi-gray').value) || 0 };
+        const { error } = id ? await db.from('contractor_kpis').update(data).eq('id', id) : await db.from('contractor_kpis').insert([data]);
+        if(!error) { resetForm('kpi'); init(); } else alert(error.message);
+    }
+    function renderKpiAssignments() {
+        document.getElementById('kpi-body').innerHTML = CACHE.kpis.map(k => `<tr><td>${k.locations?.name}</td><td>${k.contractors?.name}</td><td><span class="kpi-badge">${k.kpi_code}</span></td><td><span class="threshold-pill" style="background:var(--green)">${k.green_threshold}</span> <span class="threshold-pill" style="background:var(--gray-kpi)">${k.gray_threshold}</span></td><td><button class="btn btn-edit" onclick="editKpi('${k.id}')">Edit</button><button class="btn btn-del" onclick="delItem('contractor_kpis','${k.id}')">×</button></td></tr>`).join('');
+    }
+    function editKpi(id) {
+        const k = CACHE.kpis.find(x => x.id === id);
+        document.getElementById('kpi-id').value = k.id; document.getElementById('kpi-loc').value = k.location_id; document.getElementById('kpi-con').value = k.contractor_id;
+        document.getElementById('kpi-manual-code').value = k.kpi_code; document.getElementById('kpi-green').value = k.green_threshold; document.getElementById('kpi-gray').value = k.gray_threshold; setMode('kpi', 'upd');
+    }
+
+    /* --- ADMIN & UTILS --- */
+    async function addBase(t, c, i) { const v = document.getElementById(i).value; if(v) { await db.from(t).insert([{[c]:v}]); document.getElementById(i).value=""; init(); } }
+    
+    async function editBase(table, column, id, oldName) {
+    const newName = prompt(`Rename "${oldName}" to:`, oldName);
+    
+    if (newName && newName !== oldName) {
+        const { error } = await db
+            .from(table)
+            .update({ [column]: newName })
+            .eq('id', id);
+
+        if (!error) {
+            alert("Updated successfully!");
+            init(); // Refresh cache and UI
+        } else {
+            alert("Error: " + error.message);
+        }
+    }
+}
+    
+    function renderBase() {
+    const draw = (list, table, col) => list.map(i => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
+            <span style="font-weight:500;">${i[col]}</span>
+            <div style="display:flex; gap:5px;">
+                <button class="btn btn-edit" style="padding:2px 8px; font-size:10px;" 
+                    onclick="editBase('${table}', '${col}', '${i.id}', '${i[col]}')">Edit</button>
+                <button class="btn btn-del" style="padding:2px 8px; font-size:10px;" 
+                    onclick="delItem('${table}','${i.id}')">×</button>
+            </div>
+        </div>`).join('');
+
+    document.getElementById('l-list').innerHTML = draw(CACHE.locs, 'locations', 'name');
+    document.getElementById('c-list').innerHTML = draw(CACHE.cons, 'contractors', 'name');
+    document.getElementById('f-list').innerHTML = draw(CACHE.types, 'facilities', 'facility_type');
+}
+    function syncPerfCons() {
+        const lid = document.getElementById('perf-loc').value;
+        const conIds = [...new Set(CACHE.kpis.filter(k => k.location_id === lid).map(k => k.contractor_id))];
+        document.getElementById('perf-con').innerHTML = '<option value="">-- Contractor --</option>' + CACHE.cons.filter(c => conIds.includes(c.id)).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+    function syncPerfCodes() {
+        const lid = document.getElementById('perf-loc').value, cid = document.getElementById('perf-con').value;
+        const codes = CACHE.kpis.filter(k => k.location_id === lid && k.contractor_id === cid);
+        document.getElementById('perf-code').innerHTML = codes.map(k => `<option value="${k.id}">${k.kpi_code}</option>`).join('');
+    }
+    function populateDrops() {
+    const dr = (l, k) => l.map(i => `<option value="${i.id}">${i[k]}</option>`).join('');
+    
+    // Updated Site dropdowns
+    ['entry-loc', 'perf-loc', 'set-loc', 'kpi-loc'].forEach(id => {
+        document.getElementById(id).innerHTML = '<option value="">-- Select Site --</option>' + dr(CACHE.locs, 'name');
+    });
+
+    // Updated Facility Type
+    document.getElementById('set-fac').innerHTML = '<option value="">-- Select Type --</option>' + dr(CACHE.types, 'facility_type');
+
+    // Updated Contractor dropdowns (Crucial Change)
+    ['set-con', 'kpi-con'].forEach(id => {
+        document.getElementById(id).innerHTML = '<option value="">-- Select Contractor (Optional for Acc.) --</option>' + dr(CACHE.cons, 'name');
+    });
+}
+
+    async function delItem(t, id) { if(confirm("Delete?")) { await db.from(t).delete().eq('id', id); init(); } }
+    function setMode(p, m) {
+        const btn = document.getElementById(p + '-btn'), title = document.getElementById(p + '-title');
+        btn.innerText = (m === 'upd' ? "Update Record" : "Post Daily Record");
+        btn.className = (m === 'upd' ? "btn btn-upd" : "btn btn-add");
+        title.innerText = (m === 'upd' ? "Edit Record" : "New Record");
+    }
+    function resetForm(p) { 
+        if(document.getElementById(p + '-id')) document.getElementById(p + '-id').value = ""; 
+        if(p === 'entry') { document.getElementById('in-oc').value = ""; document.getElementById('in-md').value = ""; document.getElementById('in-rec').value = ""; document.getElementById('in-tr').value = ""; }
+        if(p === 'kpi') { document.getElementById('kpi-green').value = ""; document.getElementById('kpi-gray').value = ""; document.getElementById('kpi-manual-code').value = ""; }
+        setMode(p, 'add'); 
+    }
+    function showPanel(id, btn) { document.querySelectorAll('.panel').forEach(p => p.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); btn.classList.add('active'); }
+    function toggleSetupFields() { 
+        const t = CACHE.types.find(x => x.id == document.getElementById('set-fac').value)?.facility_type.toUpperCase() || "";
+        const isP = t.includes('STP') || t.includes('RO');
+        document.getElementById('setup-acc').style.display = isP?'none':'grid'; 
+        document.getElementById('setup-plant').style.display = isP?'grid':'none'; 
+    }
+</script>
+</body>
+  </html>
