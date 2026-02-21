@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visual Management Board | v3.38</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary: #004c99; --accent: #00aaff; --bg: #f4f7fb;
+      --card: rgba(255, 255, 255, 0.9); --text: #1f2937;
+      --muted: #6b7280; --shadow: 0 8px 28px rgba(0, 0, 0, .08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* PRESERVED HEADER STYLE v3.21 */
+    .app-header {
+      position: fixed; inset: 0 0 auto 0; z-index: 1000;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff; box-shadow: var(--shadow);
+    }
+    .header-inner {
+      max-width: 1400px; margin: 0 auto; padding: 14px 20px;
+      display: grid; grid-template-columns: 220px 1fr 280px; align-items: center;
+    }
+    .logo { height: 52px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
+    .titles { text-align: center; }
+    .title { margin: 0; font-size: clamp(18px, 2.2vw, 28px); font-weight: 700; }
+    
+    .loc-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.15); padding: 4px 16px;
+      border-radius: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);
+      margin-top: 5px; transition: 0.2s; font-weight: 600; font-size: 0.9rem;
+    }
+    .loc-pill:hover { background: rgba(255,255,255,0.3); }
+    .datetime { text-align: right; font-size: 0.85rem; }
+
+    /* PRESERVED PAGE LAYOUT v3.21 */
+    .page { max-width: 1400px; margin: 0 auto; padding: 140px 20px 24px; }
+    .layout { display: grid; gap: 22px; grid-template-columns: 1.35fr .73fr; align-items: start; }
+
+    .section-title { color: var(--primary); margin: 0 0 12px; font-size: 1.15rem; font-weight: 700; }
+    .kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+    
+    .kpi-card {
+      background: var(--card); border-radius: 16px; box-shadow: var(--shadow);
+      padding: 1.5rem; text-align: center; display: flex; flex-direction: column; min-height: 280px;
+      backdrop-filter: blur(6px);
+    }
+    .kpi-card h3 { margin: 0 0 20px; color: var(--primary); font-size: 1.1rem; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
+    .dual-kpi { display: flex; gap: 20px; justify-content: center; flex: 1; align-items: center; }
+    .letter-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 140px; }
+    .s-block-grid { display: grid; gap: 3px; width: 100%; }
+    
+    /* PRESERVED THRESHOLD LEGEND v3.21 */
+    .threshold-legend { 
+      display: flex; gap: 8px; font-size: 0.65rem; color: var(--muted); 
+      margin-top: 10px; font-weight: 600; 
+    }
+    .legend-item { display: flex; align-items: center; gap: 3px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* RESTORED & CLEANED GENERAL INFO STYLE */
+    .info-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    .info-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; border-left: 5px solid var(--accent); position: relative;}
+    .info-title { color: var(--primary); font-weight: 700; font-size: 0.9rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .info-tag { font-size: 0.6rem; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+    
+    .metric-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+    .metric-row.triple { grid-template-columns: repeat(3, 1fr); }
+    .metric-item { display: flex; flex-direction: column; }
+    .metric-lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .metric-val { font-size: 1.4rem; font-weight: 800; color: var(--primary); line-height: 1; }
+    .metric-sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+    .update-label { font-size: 0.6rem; color: #94a3b8; font-style: italic; margin-top: 15px; display: block; text-align: right; }
+
+    /* Modal */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+    .modal-content { background: #fff; padding: 30px; border-radius: 20px; width: 90%; max-width: 380px; text-align: center; }
+    .loc-btn { width: 100%; padding: 15px; margin: 8px 0; border: 2px solid #f1f5f9; border-radius: 12px; font-weight: 700; cursor: pointer; color: var(--primary); transition: 0.2s; }
+    .app-footer { text-align: center; color: #fff; padding: 15px; background: #0b3a66; margin-top: 40px; border-radius: 12px 12px 0 0; }
+
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      .header-inner { grid-template-columns: 1fr; gap: 10px; text-align: center; }
+      .datetime { text-align: center; }
+      .page { padding-top: 220px; }
+    }
+                .executive-summary {
+      display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 25px; 
+      padding: 20px; background: white; border-radius: 16px;
+      justify-content: center; box-shadow: var(--shadow);
+    }
+    .status-face-card {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+    }
+    /* The SVG face container */
+    .face-svg {
+      width: 45px; height: 45px; transition: transform 0.3s ease;
+    }
+    .face-svg:hover { transform: scale(1.1); }
+    
+    .contractor-label {
+      font-size: 0.7rem; font-weight: 800; color: var(--primary); 
+      text-transform: uppercase; text-align: center; max-width: 100px;
+    }
+
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand"><img src="https://qualityconferenceoman.com/images/pdo-logo.png" class="logo"></div>
+    <div class="titles">
+      <h1 class="title">Visual Management Board</h1>
+      <div id="locTrigger" class="loc-pill">📍 <span id="locNameLabel">Select Site</span></div>
+    </div>
+    <div class="datetime">
+      <div id="curDate" style="font-weight:700"></div>
+      <div id="curTime" style="opacity:0.8"></div>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="layout">
+          <section>
+      <h2 class="section-title">Executive Health Summary</h2>
+      <div id="executiveSummary" class="executive-summary"></div> <h2 class="section-title">Contractor Performance Matrix</h2>
+      <div id="kpiContainer" class="kpi-grid"></div>
+    </section>
+
+    <section>
+      <h2 class="section-title">General Information</h2>
+      <div id="infoContainer" class="info-grid"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="app-footer">
+  <p>© 2026 Visual Management Board | Camp Hub Pro v3.38</p>
+</footer>
+
+<script>
+  const SB_URL = 'https://lkufyubfipdaxbjdyodg.supabase.co';
+  const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxrdWZ5dWJmaXBkYXhiamR5b2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNTE5MDIsImV4cCI6MjA4NTYyNzkwMn0.2wUNKYNnoAz4zguIhHAAFfqnzVeZWEDEteKsNxFcYa8';
+  const _supabase = supabase.createClient(SB_URL, SB_KEY);
+
+  let userLocId = localStorage.getItem('userLocationId');
+  let userLocName = localStorage.getItem('userLocationName');
+
+  const PATTERNS = {
+    S12: { cols: 5, rows: ["01100","10010","10000","01100","00010","10010","01100"] },
+    Q12: { cols: 5, rows: ["01110","10001","10001","10010","01101"] },
+    D12: { cols: 5, rows: ["11100","10010","10010","10010","11100"] },
+    P12: { cols: 5, rows: ["11110","10010","11110","10000","10000"] },
+    S53: { cols: 9, rows: ["001111100","011101110","111000111","111100000","011111100","000111111","000000111","111000111","011101110","001111100"] },
+    Q53: { cols: 11, rows: ["00011111000","00110001100","01100000110","11100000111","11100000111","11100110111","01100011110","00111011100","00011110110","00000000011"] },
+    D53: { cols: 9, rows: ["111110000","111111000","110001100","110000110","110000111","110000111","110000111","110000110","110001100","111111000", "111110000"] },
+    P53: { cols: 9, rows: ["111111100","110000110","110000110","110000110","111111100","110000000","110000000","110000000","110000000","000000000"] }
+  };
+
+  async function syncAll() {
+    if (!userLocId) return checkSite();
+    document.getElementById('locNameLabel').textContent = userLocName;
+    await Promise.all([syncKPIs(), syncGeneral()]);
+  }
+
+          async function syncGeneral() {
+    try {
+      const { data: facs } = await _supabase.from('facility_locations').select('*, contractors(name)').eq('location_id', userLocId);
+      const container = document.getElementById('infoContainer'); 
+      container.innerHTML = '';
+
+      // 1. Check if facilities even exist for this site
+      if (!facs || facs.length === 0) {
+        showNoDataNote(container);
+        return;
+      }
+
+      const { data: stats } = await _supabase.from('facility_data').select('*').in('fac_loc_id', facs.map(f => f.id)).order('updated_at', { ascending: false });
+      
+      // 2. Check if stats were returned for those facilities
+      if (!stats || stats.length === 0) {
+        showNoDataNote(container);
+        return;
+      }
+      
+      // This sorts the array so that Housing (total_rooms > 0) comes first
+      facs.sort((a, b) => {
+        const typeA = a.total_rooms > 0 ? 0 : 1; // 0 for Housing, 1 for Utility
+        const typeB = b.total_rooms > 0 ? 0 : 1;
+        return typeA - typeB;
+      });
+      // --- END SORTING ---
+
+      facs.forEach(f => {
+        const d = stats?.find(s => s.fac_loc_id === f.id);
+        if (!d) return;
+
+        const card = document.createElement('div'); 
+        card.className = 'info-card';
+        const updated = new Date(d.updated_at).toLocaleTimeString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const type = f.total_rooms > 0 ? 'HOUSING' : 'UTILITY';
+
+        if (type === 'HOUSING') {
+          const occPercent = Math.round((d.occ_rooms / f.total_rooms) * 100);
+          card.innerHTML = `
+            <div class="info-title"><span>${f.prefix_name || f.contractors?.name}</span> <span class="info-tag">Housing</span></div>
+            <div class="metric-row triple">
+              <div class="metric-item"><span class="metric-lbl">Assets</span><span class="metric-val">${f.num_blocks || 0}</span><span class="metric-sub">Blocks</span></div>
+              <div class="metric-item"><span class="metric-lbl">Mandays</span><span class="metric-val">${d.mandays}</span><span class="metric-sub">Last 24h</span></div>
+              <div class="metric-item"><span class="metric-lbl">Occupancy</span><span class="metric-val">${occPercent}%</span><span class="metric-sub">${d.occ_rooms}/${f.total_rooms} Rooms</span></div>
+            </div>
+            <span class="update-label">Last Update: ${updated}</span>`;
+        } else {
+          card.innerHTML = `
+            <div class="info-title"><span>${f.prefix_name || f.contractors?.name}</span> <span class="info-tag" style="background:#fef3c7; color:#92400e;">Utility</span></div>
+            <div class="metric-row">
+              <div class="metric-item"><span class="metric-lbl">Assets</span><span class="metric-val">${f.units_count || 0}</span><span class="metric-sub">Units</span></div>
+              <div class="metric-item"><span class="metric-lbl">Capacity</span><span class="metric-val">${f.max_capacity}</span><span class="metric-sub">m³/day</span></div>
+              <div class="metric-item"><span class="metric-lbl">Received</span><span class="metric-val">${d.water_rec}</span><span class="metric-sub">m³</span></div>
+              <div class="metric-item"><span class="metric-lbl">Treated</span><span class="metric-val">${d.water_treat}</span><span class="metric-sub">m³</span></div>
+            </div>
+            <span class="update-label">Last Update: ${updated}</span>`;
+        }
+        container.appendChild(card);
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  // Helper function to show the empty state
+  function showNoDataNote(container) {
+    container.innerHTML = `
+      <div style="background:rgba(255,255,255,0.5); border:1px dashed var(--muted); padding:20px; border-radius:12px; text-align:center; color:var(--muted);">
+            <div style="font-size:1.2rem; margin-bottom:5px;">ℹ️</div>
+            <div style="font-size:0.8rem; font-weight:600;">No information available for <strong>${userLocName}<strong>.</div>
+            <div style="font-size:0.65rem; opacity:0.8;">Contact administrator to assign facilities.</div>
+          </div>`;
+  }
+
+  async function syncKPIs() {
+    try {
+      const [configRes, conRes, perfRes] = await Promise.all([
+        _supabase.from('contractor_kpis').select('*').eq('location_id', userLocId),
+        _supabase.from('contractors').select('*'),
+        _supabase.from('kpi_performance').select('*')
+      ]);
+
+      const configs = configRes.data || [];
+          const contractors = conRes.data || [];
+      const performance = perfRes.data || [];
+
+      const container = document.getElementById('kpiContainer');
+      if (configs.length === 0) {
+        container.innerHTML = `<div style="background:rgba(255,255,255,0.5); border:1px dashed var(--muted); padding:20px; border-radius:12px; text-align:center; color:var(--muted);">
+            <div style="font-size:1.2rem; margin-bottom:5px;">ℹ️</div>
+            <div style="font-size:0.8rem; font-weight:600;">Still no KPI assigned for any contractor in <strong>${userLocName}</strong>.</div>
+            <div style="font-size:0.65rem; opacity:0.8;">Contact administrator to assign KPI.</div>
+          </div>`;
+        return;
+      }
+
+      const grouped = {};
+      configs.forEach(conf => {
+        const contractor = contractors.find(c => c.id === conf.contractor_id);
+        const cName = contractor ? contractor.name : "Unknown Contractor";
+        if (!grouped[cName]) grouped[cName] = {};
+
+        const code = (conf.kpi_code || "S53").toUpperCase().trim();
+        grouped[cName][code] = {
+          scores: {},
+          green: parseFloat(conf.green_threshold || 90),
+          gray: parseFloat(conf.gray_threshold || 80),
+          lastUpdate: null
+        };
+
+        const records = performance.filter(p => p.kpi_assignment_id == conf.id || p.contractor_kpi_id == conf.id);
+        let latestDate = null;
+        records.forEach(r => {
+          const date = new Date(r.entry_date);
+          if (!latestDate || date > latestDate) latestDate = date;
+          const index = code.includes('12') ? (date.getMonth() + 1) : getISOWeek(date);
+          grouped[cName][code].scores[index] = parseFloat(r.actual_value);
+        });
+        if (latestDate) grouped[cName][code].lastUpdate = latestDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      });
+
+      renderKPIs(grouped);
+    } catch (err) { console.error(err); }
+  }
+
+  function renderKPIs(grouped) {
+    const container = document.getElementById('kpiContainer');
+    const summaryContainer = document.getElementById('executiveSummary'); // New
+    container.innerHTML = '';
+    summaryContainer.innerHTML = ''; // New
+
+    Object.keys(grouped).sort().forEach(cName => {
+      // --- START SUMMARY LOGIC ---
+      let totalSum = 0, count = 0, greenT = 90, grayT = 80;
+
+      Object.keys(grouped[cName]).forEach(code => {
+        const k = grouped[cName][code];
+        const scores = Object.values(k.scores);
+        if (scores.length > 0) {
+          totalSum += scores[scores.length - 1]; 
+          count++;
+          greenT = k.green; grayT = k.gray;
+        }
+      });
+
+      const avg = count > 0 ? (totalSum / count) : null;
+      
+      // Determine Color and Path for Mouth
+      let color = "#94a3b8"; // Default Gray
+      let mouthPath = "M15 25 Q20 25 25 25"; // Neutral line
+      
+      if (avg !== null) {
+        if (avg >= greenT) {
+          color = "#22c55e"; // Green
+          mouthPath = "M15 25 Q20 32 25 25"; // Happy Curve
+        } else if (avg >= grayT) {
+          color = "#9ca3af"; // Gray
+          mouthPath = "M15 27 Q20 27 25 27"; // Straight line
+        } else {
+          color = "#ef4444"; // Red
+          mouthPath = "M15 30 Q20 22 25 30"; // Sad Curve
+        }
+      }
+
+      const faceHtml = `
+        <svg class="face-svg" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2.5"/>
+          <circle cx="14" cy="15" r="2.5" fill="${color}"/>
+          <circle cx="26" cy="15" r="2.5" fill="${color}"/>
+          <path d="${mouthPath}" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        </svg>`;
+
+      const faceCard = document.createElement('div');
+      faceCard.className = 'status-face-card';
+      faceCard.innerHTML = `${faceHtml}<div class="contractor-label">${cName}</div>`;
+      summaryContainer.appendChild(faceCard);
+      // --- END SUMMARY LOGIC ---
+
+      const card = document.createElement('div');
+      card.className = 'kpi-card';
+      card.innerHTML = `<h3>${cName}</h3><div class="dual-kpi"></div>`;
+      const dualArea = card.querySelector('.dual-kpi');
+
+      Object.keys(grouped[cName]).forEach(code => {
+        const kData = grouped[cName][code];
+        const p = PATTERNS[code] || PATTERNS['S53'];
+        const wrap = document.createElement('div');
+        wrap.className = 'letter-wrap';
+
+        const grid = document.createElement('div');
+        grid.className = 's-block-grid';
+        grid.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
+
+        let blockNum = 1;
+        p.rows.forEach(row => {
+          row.split('').forEach(cell => {
+            const b = document.createElement('div');
+            b.style.cssText = "aspect-ratio:1/1; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700;";
+            if (cell === '1') {
+              const val = kData.scores[blockNum];
+              b.textContent = blockNum;
+              b.style.backgroundColor = "#e5e7eb"; b.style.color = "#4b5563";
+              if (val !== undefined) {
+                if (val >= kData.green) { b.style.backgroundColor = "#22c55e"; b.style.color = "white"; }
+                else if (val >= kData.gray) { b.style.backgroundColor = "#9ca3af"; b.style.color = "white"; }
+                else { b.style.backgroundColor = "#ef4444"; b.style.color = "white"; }
+              }
+              blockNum++;
+            } else { b.style.backgroundColor = "transparent"; b.style.color = "transparent"; }
+            grid.appendChild(b);
+          });
+        });
+        
+        wrap.appendChild(grid);
+        
+        // Exact preservation of Legend and Last Update labels
+        const legend = document.createElement('div');
+        legend.className = 'threshold-legend';
+        legend.innerHTML = `
+          <div class="legend-item"><div class="dot" style="background:#22c55e"></div>&ge;${kData.green}</div>
+          <div class="legend-item"><div class="dot" style="background:#9ca3af"></div>&ge;${kData.gray}</div>
+          <div class="legend-item"><div class="dot" style="background:#ef4444"></div>&lt;${kData.gray}</div>
+        `;
+        wrap.appendChild(legend);
+
+        const up = document.createElement('div');
+        up.style.cssText = "font-size:0.6rem; color:#94a3b8; font-style:italic; margin-top:4px;";
+        up.textContent = `Last Update: ${kData.lastUpdate || 'No Data'}`;
+        wrap.appendChild(up);
+
+        dualArea.appendChild(wrap);
+      });
+      container.appendChild(card);
+    });
+  }
+
+  function getISOWeek(d) { d=new Date(d); d.setHours(0,0,0,0); d.setDate(d.getDate()+4-(d.getDay()||7)); return Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7); }
+  function updateClock() { document.getElementById('curDate').textContent = new Date().toLocaleDateString(undefined, {weekday:'long', day:'2-digit', month:'long'}); document.getElementById('curTime').textContent = new Date().toLocaleTimeString(); }
+  async function checkSite() {
+    const { data } = await _supabase.from('locations').select('*');
+    const modal = document.createElement('div'); modal.className = 'modal';
+    modal.innerHTML = `<div class="modal-content"><h2>Select Operational Site</h2><div id="lList"></div></div>`;
+    data?.forEach(l => {
+      const b = document.createElement('button'); b.className = 'loc-btn'; b.textContent = l.name;
+      b.onclick = () => { localStorage.setItem('userLocationId', l.id); localStorage.setItem('userLocationName', l.name); location.reload(); };
+      modal.querySelector('#lList').appendChild(b);
+    });
+    document.body.appendChild(modal);
+  }
+  document.getElementById('locTrigger').onclick = () => { localStorage.clear(); location.reload(); };
+  setInterval(updateClock, 1000); updateClock(); syncAll();
+</script>
+</body>
+</html>
