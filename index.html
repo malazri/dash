@@ -250,53 +250,85 @@
 
   async function syncKPIs() {
     try {
-      const [configRes, conRes, perfRes] = await Promise.all([
+      const [configRes, conRes, perfRes, facRes, facLocRes] = await Promise.all([
         _supabase.from('contractor_kpis').select('*').eq('location_id', userLocId),
         _supabase.from('contractors').select('*'),
-        _supabase.from('kpi_performance').select('*')
+        _supabase.from('kpi_performance').select('*'),
+        _supabase.from('facilities').select('id, facility_type'),
+        _supabase.from('facility_locations').select('*').eq('location_id', userLocId)
       ]);
 
       const configs = configRes.data || [];
-          const contractors = conRes.data || [];
+      const contractors = conRes.data || [];
       const performance = perfRes.data || [];
+      const facilities = facRes.data || [];
+      const facLocs = facLocRes.data || [];
 
       const container = document.getElementById('kpiContainer');
       if (configs.length === 0) {
-        container.innerHTML = `<div style="background:rgba(255,255,255,0.5); border:1px dashed var(--muted); padding:20px; border-radius:12px; text-align:center; color:var(--muted);">
-            <div style="font-size:1.2rem; margin-bottom:5px;">ℹ️</div>
-            <div style="font-size:0.8rem; font-weight:600;">Still no KPI assigned for any contractor in <strong>${userLocName}</strong>.</div>
-            <div style="font-size:0.65rem; opacity:0.8;">Contact administrator to assign KPI.</div>
-          </div>`;
+        container.innerHTML = `<div style="padding:20px; text-align:center; color:gray;">No KPIs assigned to ${userLocName}.</div>`;
         return;
       }
 
       const grouped = {};
       configs.forEach(conf => {
-        const contractor = contractors.find(c => c.id === conf.contractor_id);
-        const cName = contractor ? contractor.name : "Unknown Contractor";
-        if (!grouped[cName]) grouped[cName] = {};
+        // 1. Find Contractor Name
+        const contractor = contractors.find(c => String(c.id).toLowerCase() === String(conf.contractor_id).toLowerCase());
+        const cName = contractor ? contractor.name : "Contractor";
+
+        // 2. NEW BRIDGE LOGIC: Find the facility name via the contractor_id mapping
+        let fSuffix = "General";
+        
+        // Look in facility_locations for an entry matching this contractor
+        const mapping = facLocs.find(fl => 
+          String(fl.contractor_id).toLowerCase() === String(conf.contractor_id).toLowerCase()
+        );
+
+        if (mapping) {
+          if (mapping.prefix_name && mapping.prefix_name.trim() !== "") {
+            // Use the Prefix (e.g., "North Camp")
+            fSuffix = mapping.prefix_name;
+          } else {
+            // If no prefix, look up the facility type (e.g., "Accommodation")
+            const baseType = facilities.find(f => String(f.id).toLowerCase() === String(mapping.facility_id).toLowerCase());
+            if (baseType) fSuffix = baseType.facility_type;
+          }
+        }
+
+        const displayName = `${cName} (${fSuffix})`;
+
+        if (!grouped[displayName]) grouped[displayName] = {};
 
         const code = (conf.kpi_code || "S53").toUpperCase().trim();
-        grouped[cName][code] = {
+        grouped[displayName][code] = {
           scores: {},
           green: parseFloat(conf.green_threshold || 90),
           gray: parseFloat(conf.gray_threshold || 80),
           lastUpdate: null
         };
 
-        const records = performance.filter(p => p.kpi_assignment_id == conf.id || p.contractor_kpi_id == conf.id);
+        const records = performance.filter(p => 
+          String(p.kpi_assignment_id) === String(conf.id) || 
+          String(p.contractor_kpi_id) === String(conf.id)
+        );
+
         let latestDate = null;
         records.forEach(r => {
           const date = new Date(r.entry_date);
           if (!latestDate || date > latestDate) latestDate = date;
           const index = code.includes('12') ? (date.getMonth() + 1) : getISOWeek(date);
-          grouped[cName][code].scores[index] = parseFloat(r.actual_value);
+          grouped[displayName][code].scores[index] = parseFloat(r.actual_value);
         });
-        if (latestDate) grouped[cName][code].lastUpdate = latestDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        
+        if (latestDate) {
+          grouped[displayName][code].lastUpdate = latestDate.toLocaleDateString('en-GB', { 
+            day: '2-digit', month: 'short', year: 'numeric' 
+          });
+        }
       });
 
       renderKPIs(grouped);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("KPI Sync Error:", err); }
   }
 
   function renderKPIs(grouped) {
