@@ -176,67 +176,83 @@
   }
 
           async function syncGeneral() {
-    try {
-      const { data: facs } = await _supabase.from('facility_locations').select('*, contractors(name)').eq('location_id', userLocId);
-      const container = document.getElementById('infoContainer'); 
-      container.innerHTML = '';
+  try {
+    const { data: facs } = await _supabase
+      .from('facility_locations')
+      .select('*, contractors(name), facilities(facility_type)')
+      .eq('location_id', userLocId);
+    
+    const container = document.getElementById('infoContainer'); 
+    container.innerHTML = '';
 
-      // 1. Check if facilities even exist for this site
-      if (!facs || facs.length === 0) {
-        showNoDataNote(container);
-        return;
+    if (!facs || facs.length === 0) {
+      showNoDataNote(container);
+      return;
+    }
+
+    const { data: stats } = await _supabase
+      .from('facility_data')
+      .select('*')
+      .in('fac_loc_id', facs.map(f => f.id))
+      .order('updated_at', { ascending: false });
+
+    // Sort: Housing (total_rooms > 0) first
+    facs.sort((a, b) => (a.total_rooms > 0 ? 0 : 1) - (b.total_rooms > 0 ? 0 : 1));
+
+    facs.forEach(f => {
+      const d = stats?.find(s => s.fac_loc_id === f.id);
+      if (!d) return;
+
+      const card = document.createElement('div'); 
+      card.className = 'info-card';
+      const updated = new Date(d.updated_at).toLocaleTimeString([], { 
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+      });
+      
+      const typeLabel = f.total_rooms > 0 ? 'Housing' : 'Utility';
+      const typeClass = f.total_rooms > 0 ? '' : 'style="background:#fef3c7; color:#92400e;"';
+
+      // --- IMPROVED NAMING LOGIC ---
+      const rawName = f.contractors?.name || "";
+      let displayName = rawName;
+
+      // Check if the name is specifically "PDO" (ignoring spaces/case)
+      const isPDO = rawName.trim().toUpperCase() === "PDO";
+
+      if (!isPDO) {
+        // Only add the suffix if it's NOT PDO
+        const fSuffix = f.prefix_name || f.facilities?.facility_type || "General";
+        displayName = `${rawName} (${fSuffix})`;
+      } else {
+        // If it IS PDO, force the name to be exactly "PDO"
+        displayName = "PDO";
       }
 
-      const { data: stats } = await _supabase.from('facility_data').select('*').in('fac_loc_id', facs.map(f => f.id)).order('updated_at', { ascending: false });
-      
-      // 2. Check if stats were returned for those facilities
-      if (!stats || stats.length === 0) {
-        showNoDataNote(container);
-        return;
+      if (f.total_rooms > 0) {
+        const occPercent = Math.round((d.occ_rooms / f.total_rooms) * 100);
+        card.innerHTML = `
+          <div class="info-title"><span>${displayName}</span> <span class="info-tag">${typeLabel}</span></div>
+          <div class="metric-row triple">
+            <div class="metric-item"><span class="metric-lbl">Assets</span><span class="metric-val">${f.num_blocks || 0}</span><span class="metric-sub">Blocks</span></div>
+            <div class="metric-item"><span class="metric-lbl">Mandays</span><span class="metric-val">${d.mandays}</span><span class="metric-sub">Last 24h</span></div>
+            <div class="metric-item"><span class="metric-lbl">Occupancy</span><span class="metric-val">${occPercent}%</span><span class="metric-sub">${d.occ_rooms}/${f.total_rooms} Rooms</span></div>
+          </div>
+          <span class="update-label">Last Update: ${updated}</span>`;
+      } else {
+        card.innerHTML = `
+          <div class="info-title"><span>${displayName}</span> <span class="info-tag" ${typeClass}>${typeLabel}</span></div>
+          <div class="metric-row">
+            <div class="metric-item"><span class="metric-lbl">Assets</span><span class="metric-val">${f.units_count || 0}</span><span class="metric-sub">Units</span></div>
+            <div class="metric-item"><span class="metric-lbl">Capacity</span><span class="metric-val">${f.max_capacity}</span><span class="metric-sub">m³/day</span></div>
+            <div class="metric-item"><span class="metric-lbl">Received</span><span class="metric-val">${d.water_rec}</span><span class="metric-sub">m³</span></div>
+            <div class="metric-item"><span class="metric-lbl">Treated</span><span class="metric-val">${d.water_treat}</span><span class="metric-sub">m³</span></div>
+          </div>
+          <span class="update-label">Last Update: ${updated}</span>`;
       }
-      
-      // This sorts the array so that Housing (total_rooms > 0) comes first
-      facs.sort((a, b) => {
-        const typeA = a.total_rooms > 0 ? 0 : 1; // 0 for Housing, 1 for Utility
-        const typeB = b.total_rooms > 0 ? 0 : 1;
-        return typeA - typeB;
-      });
-      // --- END SORTING ---
-
-      facs.forEach(f => {
-        const d = stats?.find(s => s.fac_loc_id === f.id);
-        if (!d) return;
-
-        const card = document.createElement('div'); 
-        card.className = 'info-card';
-        const updated = new Date(d.updated_at).toLocaleTimeString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-        const type = f.total_rooms > 0 ? 'HOUSING' : 'UTILITY';
-
-        if (type === 'HOUSING') {
-          const occPercent = Math.round((d.occ_rooms / f.total_rooms) * 100);
-          card.innerHTML = `
-            <div class="info-title"><span>${f.prefix_name || f.contractors?.name}</span> <span class="info-tag">Housing</span></div>
-            <div class="metric-row triple">
-              <div class="metric-item"><span class="metric-lbl">Assets</span><span class="metric-val">${f.num_blocks || 0}</span><span class="metric-sub">Blocks</span></div>
-              <div class="metric-item"><span class="metric-lbl">Mandays</span><span class="metric-val">${d.mandays}</span><span class="metric-sub">Last 24h</span></div>
-              <div class="metric-item"><span class="metric-lbl">Occupancy</span><span class="metric-val">${occPercent}%</span><span class="metric-sub">${d.occ_rooms}/${f.total_rooms} Rooms</span></div>
-            </div>
-            <span class="update-label">Last Update: ${updated}</span>`;
-        } else {
-          card.innerHTML = `
-            <div class="info-title"><span>${f.prefix_name || f.contractors?.name}</span> <span class="info-tag" style="background:#fef3c7; color:#92400e;">Utility</span></div>
-            <div class="metric-row">
-              <div class="metric-item"><span class="metric-lbl">Assets</span><span class="metric-val">${f.units_count || 0}</span><span class="metric-sub">Units</span></div>
-              <div class="metric-item"><span class="metric-lbl">Capacity</span><span class="metric-val">${f.max_capacity}</span><span class="metric-sub">m³/day</span></div>
-              <div class="metric-item"><span class="metric-lbl">Received</span><span class="metric-val">${d.water_rec}</span><span class="metric-sub">m³</span></div>
-              <div class="metric-item"><span class="metric-lbl">Treated</span><span class="metric-val">${d.water_treat}</span><span class="metric-sub">m³</span></div>
-            </div>
-            <span class="update-label">Last Update: ${updated}</span>`;
-        }
-        container.appendChild(card);
-      });
-    } catch (e) { console.error(e); }
-  }
+      container.appendChild(card);
+    });
+  } catch (e) { console.error("General Sync Error:", e); }
+}
 
   // Helper function to show the empty state
   function showNoDataNote(container) {
