@@ -79,6 +79,7 @@
                 <button id="entry-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveDailyEntry()">Post Daily Record</button>
             </div>
         </div>
+        <div class="filter-container" style="margin: 15px 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px;"></div> /* new filter section */
         <div id="log-filter-bar" style="margin: 15px 0; display: flex; align-items: center; gap: 12px; overflow-x: auto; padding-bottom: 5px;">
     <span style="font-size: 11px; font-weight: 800; color: var(--gray-kpi); text-transform: uppercase; white-space: nowrap;">Quick Filter:</span>
     <div id="filter-chips" style="display: flex; gap: 8px;"></div>
@@ -103,6 +104,7 @@
             </div>
             <button id="perf-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveKPIPerformance()">Submit Record</button>
         </div>
+        <div class="filter-container" style="margin: 15px 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px;"></div>
         <table><thead><tr><th>Date</th><th>Site</th><th>Contractor</th><th>Code</th><th>Value</th><th>Action</th></tr></thead><tbody id="perf-body"></tbody></table>
     </section>
 
@@ -126,6 +128,7 @@
             </div>
             <button id="setup-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveSetup()">Create Assignment</button>
         </div>
+        <div class="filter-container" style="margin: 15px 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px;"></div>
         <table><thead><tr><th>Site</th><th>Facility</th><th>Contractor</th><th>Action</th></tr></thead><tbody id="manage-body"></tbody></table>
     </section>
 
@@ -144,6 +147,7 @@
             </div>
             <button id="kpi-btn" class="btn btn-add" style="margin-top:15px;" onclick="saveKPIAssignment()">Link KPI & Set Thresholds</button>
         </div>
+        <div class="filter-container" style="margin: 15px 0; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px;"></div>
         <table><thead><tr><th>Site</th><th>Contractor</th><th>Code</th><th>Thresholds</th><th>Action</th></tr></thead><tbody id="kpi-body"></tbody></table>
     </section>
 
@@ -163,6 +167,7 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxrdWZ5dWJmaXBkYXhiamR5b2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNTE5MDIsImV4cCI6MjA4NTYyNzkwMn0.2wUNKYNnoAz4zguIhHAAFfqnzVeZWEDEteKsNxFcYa8';
     const db = supabase.createClient(SB_URL, SB_KEY);
     let CACHE = { locs:[], types:[], cons:[], mapping:[], kpis:[], performance:[], logs:[] };
+    let FILTERS = { update: 'ALL', 'kpi-data': 'ALL', manage: 'ALL', 'kpi-panel': 'ALL'};
 
     window.onload = () => init();
 
@@ -201,8 +206,43 @@
     // These two ensure the table loads "All" by default on start
     renderLogFilters(); 
     renderEntryTable();
+
+    // Refresh Filters
+    renderSectionFilters('update', 'logs', 'entry-body');
+    renderSectionFilters('kpi-data', 'performance', 'perf-body');
+    renderSectionFilters('manage', 'mapping', 'manage-body');
+    renderSectionFilters('kpi-panel', 'kpis', 'kpi-body');
 }
 
+    function renderSectionFilters(panelId, cacheKey, tableBodyId) {
+    const container = document.querySelector(`#${panelId} .filter-container`);
+    if (!container) return;
+
+    const counts = {};
+    let total = 0;
+
+    // Calculate counts based on the specific CACHE key
+    CACHE[cacheKey].forEach(item => {
+        // Handle different data structures across tables
+        const locName = item.locations?.name || item.location_name || "Unknown";
+        counts[locName] = (counts[locName] || 0) + 1;
+        total++;
+    });
+
+    let html = `<button class="btn" style="background:${FILTERS[panelId] === 'ALL' ? 'var(--primary)' : '#fff'}; color:${FILTERS[panelId] === 'ALL' ? '#fff' : 'var(--primary)'}; border:1px solid var(--primary)" onclick="applyFilter('${panelId}', 'ALL', '${cacheKey}', '${tableBodyId}')">All (${total})</button>`;
+
+    Object.keys(counts).sort().forEach(loc => {
+        const isActive = FILTERS[panelId] === loc;
+        html += `<button class="btn" style="background:${isActive ? 'var(--accent)' : '#fff'}; color:${isActive ? '#fff' : '#64748b'}; border:1px solid ${isActive ? 'var(--accent)' : '#e2e8f0'}" onclick="applyFilter('${panelId}', '${loc}', '${cacheKey}', '${tableBodyId}')">${loc} (${counts[loc]})</button>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function applyFilter(panelId, loc, cacheKey, tableBodyId) {
+    FILTERS[panelId] = loc;
+    init(); // Re-run init/render sequence to update chips and tables
+}
     /* --- LOGIC: INSIGHT --- */
     function renderInsight() {
         const f = document.getElementById('f-insight').value.toLowerCase();
@@ -362,6 +402,8 @@ function setLogFilter(loc) {
         setMode('perf', 'upd');
     }
     function renderPerfTable() {
+        const filtered = CACHE.performance.filter(p => FILTERS['kpi-data'] === 'ALL' || (p.locations?.name === FILTERS['kpi-data']));
+        
         document.getElementById('perf-body').innerHTML = CACHE.performance.map(p => {
             const k = p.contractor_kpis;
             let color = 'inherit';
@@ -438,6 +480,8 @@ function resetForm(p) {
 
 
     function renderManage() {
+    const filtered = CACHE.mapping.filter(m => FILTERS['manage'] === 'ALL' || (m.locations?.name === FILTERS['manage']));
+        
     document.getElementById('manage-body').innerHTML = CACHE.mapping.map(m => {
         const contractorDisplay = m.contractors?.name ? m.contractors.name : '<span style="color:#94a3b8; font-style:italic;">Internal</span>';
         
@@ -466,6 +510,8 @@ function resetForm(p) {
         if(!error) { resetForm('kpi'); init(); } else alert(error.message);
     }
     function renderKpiAssignments() {
+        const filtered = CACHE.mapping.filter(m => FILTERS['kpi-panel'] === 'ALL' || (m.locations?.name === FILTERS['kpi-panel']));
+        
         document.getElementById('kpi-body').innerHTML = CACHE.kpis.map(k => `<tr><td>${k.locations?.name}</td><td>${k.contractors?.name}</td><td><span class="kpi-badge">${k.kpi_code}</span></td><td><span class="threshold-pill" style="background:var(--green)">${k.green_threshold}</span> <span class="threshold-pill" style="background:var(--gray-kpi)">${k.gray_threshold}</span></td><td><button class="btn btn-edit" onclick="editKpi('${k.id}')">Edit</button><button class="btn btn-del" onclick="delItem('contractor_kpis','${k.id}')">×</button></td></tr>`).join('');
     }
     function editKpi(id) {
