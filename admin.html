@@ -404,7 +404,7 @@ function setLogFilter(loc) {
     function renderPerfTable() {
         const filtered = CACHE.performance.filter(p => FILTERS['kpi-data'] === 'ALL' || (p.locations?.name === FILTERS['kpi-data']));
         
-        document.getElementById('perf-body').innerHTML = CACHE.performance.map(p => {
+        document.getElementById('perf-body').innerHTML = filtered.map(p => {
             const k = p.contractor_kpis;
             let color = 'inherit';
             if (k && k.green_threshold) {
@@ -482,7 +482,7 @@ function resetForm(p) {
     function renderManage() {
     const filtered = CACHE.mapping.filter(m => FILTERS['manage'] === 'ALL' || (m.locations?.name === FILTERS['manage']));
         
-    document.getElementById('manage-body').innerHTML = CACHE.mapping.map(m => {
+    document.getElementById('manage-body').innerHTML = filtered.map(m => {
         const contractorDisplay = m.contractors?.name ? m.contractors.name : '<span style="color:#94a3b8; font-style:italic;">Internal</span>';
         
         return `<tr>
@@ -510,9 +510,9 @@ function resetForm(p) {
         if(!error) { resetForm('kpi'); init(); } else alert(error.message);
     }
     function renderKpiAssignments() {
-        const filtered = CACHE.mapping.filter(m => FILTERS['kpi-panel'] === 'ALL' || (m.locations?.name === FILTERS['kpi-panel']));
+        const filtered = CACHE.kpis.filter(m => FILTERS['kpi-panel'] === 'ALL' || (m.locations?.name === FILTERS['kpi-panel']));
         
-        document.getElementById('kpi-body').innerHTML = CACHE.kpis.map(k => `<tr><td>${k.locations?.name}</td><td>${k.contractors?.name}</td><td><span class="kpi-badge">${k.kpi_code}</span></td><td><span class="threshold-pill" style="background:var(--green)">${k.green_threshold}</span> <span class="threshold-pill" style="background:var(--gray-kpi)">${k.gray_threshold}</span></td><td><button class="btn btn-edit" onclick="editKpi('${k.id}')">Edit</button><button class="btn btn-del" onclick="delItem('contractor_kpis','${k.id}')">×</button></td></tr>`).join('');
+        document.getElementById('kpi-body').innerHTML = filtered.map(k => `<tr><td>${k.locations?.name}</td><td>${k.contractors?.name}</td><td><span class="kpi-badge">${k.kpi_code}</span></td><td><span class="threshold-pill" style="background:var(--green)">${k.green_threshold}</span> <span class="threshold-pill" style="background:var(--gray-kpi)">${k.gray_threshold}</span></td><td><button class="btn btn-edit" onclick="editKpi('${k.id}')">Edit</button><button class="btn btn-del" onclick="delItem('contractor_kpis','${k.id}')">×</button></td></tr>`).join('');
     }
     function editKpi(id) {
         const k = CACHE.kpis.find(x => x.id === id);
