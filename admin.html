@@ -137,7 +137,7 @@
             <h4 id="kpi-title">Link KPI Assignment</h4>
             <input type="hidden" id="kpi-id">
             <div class="grid">
-                <div><label>Site</label><select id="kpi-loc"></select></div>
+                <div><label>Site</label><select id="kpi-loc" onchange="syncKpiCons()"></select></div>
                 <div><label>Contractor</label><select id="kpi-con"></select></div>
                 <div><label>KPI Code</label><input type="text" id="kpi-manual-code"></div>
             </div>
@@ -515,10 +515,19 @@ function resetForm(p) {
         document.getElementById('kpi-body').innerHTML = filtered.map(k => `<tr><td>${k.locations?.name}</td><td>${k.contractors?.name}</td><td><span class="kpi-badge">${k.kpi_code}</span></td><td><span class="threshold-pill" style="background:var(--green)">${k.green_threshold}</span> <span class="threshold-pill" style="background:var(--gray-kpi)">${k.gray_threshold}</span></td><td><button class="btn btn-edit" onclick="editKpi('${k.id}')">Edit</button><button class="btn btn-del" onclick="delItem('contractor_kpis','${k.id}')">×</button></td></tr>`).join('');
     }
     function editKpi(id) {
-        const k = CACHE.kpis.find(x => x.id === id);
-        document.getElementById('kpi-id').value = k.id; document.getElementById('kpi-loc').value = k.location_id; document.getElementById('kpi-con').value = k.contractor_id;
-        document.getElementById('kpi-manual-code').value = k.kpi_code; document.getElementById('kpi-green').value = k.green_threshold; document.getElementById('kpi-gray').value = k.gray_threshold; setMode('kpi', 'upd');
-    }
+    const k = CACHE.kpis.find(x => x.id === id);
+    document.getElementById('kpi-id').value = k.id;
+    document.getElementById('kpi-loc').value = k.location_id;
+    
+    // Manually trigger the sync based on the loaded location
+    syncKpiCons();
+    
+    document.getElementById('kpi-con').value = k.contractor_id;
+    document.getElementById('kpi-manual-code').value = k.kpi_code;
+    document.getElementById('kpi-green').value = k.green_threshold;
+    document.getElementById('kpi-gray').value = k.gray_threshold;
+    setMode('kpi', 'upd');
+}
 
     /* --- ADMIN & UTILS --- */
     async function addBase(t, c, i) { const v = document.getElementById(i).value; if(v) { await db.from(t).insert([{[c]:v}]); document.getElementById(i).value=""; init(); } }
@@ -570,18 +579,17 @@ function resetForm(p) {
     function populateDrops() {
     const dr = (l, k) => l.map(i => `<option value="${i.id}">${i[k]}</option>`).join('');
     
-    // Updated Site dropdowns
+    // Load all sites
     ['entry-loc', 'perf-loc', 'set-loc', 'kpi-loc'].forEach(id => {
-        document.getElementById(id).innerHTML = '<option value="">-- Select Site --</option>' + dr(CACHE.locs, 'name');
+        document.getElementById(id).innerHTML = '<option value="">-- Site --</option>' + dr(CACHE.locs, 'name');
     });
 
-    // Updated Facility Type
-    document.getElementById('set-fac').innerHTML = '<option value="">-- Select Type --</option>' + dr(CACHE.types, 'facility_type');
-
-    // Updated Contractor dropdowns (Crucial Change)
-    ['set-con', 'kpi-con'].forEach(id => {
-        document.getElementById(id).innerHTML = '<option value="">-- Select Contractor (Optional for Acc.) --</option>' + dr(CACHE.cons, 'name');
-    });
+    // Load static lists
+    document.getElementById('set-fac').innerHTML = '<option value="">-- Type --</option>' + dr(CACHE.types, 'facility_type');
+    document.getElementById('set-con').innerHTML = '<option value="">-- Contractor --</option>' + dr(CACHE.cons, 'name');
+    
+    // Set KPI Contractor to initial empty state
+    document.getElementById('kpi-con').innerHTML = '<option value="">-- Select Site First --</option>';
 }
 
     async function delItem(t, id) { if(confirm("Delete?")) { await db.from(t).delete().eq('id', id); init(); } }
@@ -604,6 +612,32 @@ function resetForm(p) {
         document.getElementById('setup-acc').style.display = isP?'none':'grid'; 
         document.getElementById('setup-plant').style.display = isP?'grid':'none'; 
     }
+
+    function syncKpiCons() {
+    const lid = document.getElementById('kpi-loc').value;
+    const conSelect = document.getElementById('kpi-con');
+    
+    if (!lid) {
+        conSelect.innerHTML = '<option value="">-- Select Site First --</option>';
+        return;
+    }
+
+    // Find unique contractor IDs assigned to this site in the Mapping table
+    const assignedConIds = [...new Set(
+        CACHE.mapping
+            .filter(m => m.location_id === lid && m.contractor_id)
+            .map(m => m.contractor_id)
+    )];
+
+    const filteredCons = CACHE.cons.filter(c => assignedConIds.includes(c.id));
+
+    if (filteredCons.length === 0) {
+        conSelect.innerHTML = '<option value="">No Contractors Found at Site</option>';
+    } else {
+        conSelect.innerHTML = '<option value="">-- Select Contractor --</option>' + 
+            filteredCons.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+}
 </script>
 </body>
   </html>
