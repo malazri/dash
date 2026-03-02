@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Hub Pro | v3.0</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0d1117;
+  --ink-2: #161b22;
+  --surface: #f6f8fa;
+  --card: #ffffff;
+  --border: #d0d7de;
+  --border-light: #e8ecf0;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --accent-bg: #ddf4ff;
+  --green: #1a7f37;
+  --green-bg: #dafbe1;
+  --amber: #9a6700;
+  --amber-bg: #fff8c5;
+  --red: #cf222e;
+  --red-bg: #ffebe9;
+  --muted: #57606a;
+  --sidebar-w: 230px;
+  --topbar-h: 57px;
+  --radius: 10px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow: hidden; /* body stays locked — scroll happens inside main-wrap */
+}
+
+/* ─── SIDEBAR ──────────────────────────────────────── */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
+  background: var(--ink-2); display: flex; flex-direction: column;
+  z-index: 200; transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-header {
+  padding: 20px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon {
+  width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px; font-weight: 700; font-family: 'Space Mono', monospace;
+  flex-shrink: 0;
+}
+.brand-name { color: #e6edf3; font-weight: 700; font-size: 14px; }
+.brand-ver { color: #484f58; font-size: 10px; font-family: 'Space Mono', monospace; }
+.sidebar-close-btn {
+  display: none; background: none; border: none; color: #8b949e;
+  font-size: 20px; cursor: pointer; padding: 4px;
+}
+
+.nav { flex: 1; padding: 10px 8px; overflow-y: auto; }
+.nav-group { margin-bottom: 20px; }
+.nav-group-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #484f58;
+  text-transform: uppercase; padding: 0 10px 6px; display: block;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-radius: 8px; cursor: pointer; color: #8b949e; font-size: 13px; font-weight: 500;
+  margin-bottom: 1px; transition: all 0.14s; border: none; background: none;
+  width: 100%; text-align: left; font-family: 'DM Sans', sans-serif;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.05); color: #e6edf3; }
+.nav-btn.active { background: rgba(9,105,218,0.18); color: #58a6ff; font-weight: 600; }
+.nav-btn .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto; background: rgba(9,105,218,0.25); color: #58a6ff;
+  font-size: 10px; padding: 1px 7px; border-radius: 10px; font-family: 'Space Mono', monospace;
+}
+
+.sidebar-footer {
+  padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 10px;
+}
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--green));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.user-name { color: #e6edf3; font-size: 12px; font-weight: 600; }
+.user-role { color: #484f58; font-size: 10px; }
+
+/* ─── MOBILE OVERLAY ────────────────────────────────── */
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  z-index: 199; backdrop-filter: blur(2px);
+}
+.overlay.show { display: block; }
+
+/* ─── TOPBAR ────────────────────────────────────────── */
+.topbar {
+  position: fixed; top: 0; left: var(--sidebar-w); right: 0;
+  height: var(--topbar-h); background: white; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; padding: 0 20px;
+  z-index: 100; box-shadow: var(--shadow-sm);
+}
+.hamburger-btn {
+  display: none; background: none; border: none; cursor: pointer;
+  padding: 6px; border-radius: 6px; color: var(--muted);
+}
+.hamburger-btn svg { display: block; }
+.topbar-title { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
+.topbar-title span { color: var(--muted); font-weight: 400; font-size: 13px; }
+.search-box {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 7px 12px; width: 220px;
+}
+.search-box input {
+  border: none; background: none; font-size: 13px; color: var(--ink);
+  outline: none; width: 100%; font-family: 'DM Sans', sans-serif;
+}
+.search-box input::placeholder { color: var(--muted); }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  width: 34px; height: 34px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 15px; transition: all 0.14s; position: relative;
+}
+.icon-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+.notif-dot {
+  position: absolute; top: 6px; right: 6px; width: 7px; height: 7px;
+  background: var(--red); border-radius: 50%; border: 1.5px solid white;
+}
+.sync-btn {
+  display: flex; align-items: center; gap: 6px; padding: 7px 14px;
+  background: var(--ink); color: white; border: none; border-radius: var(--radius);
+  font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s;
+}
+.sync-btn:hover { background: var(--ink-2); }
+.sync-btn.spinning .sync-icon { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── MAIN CONTENT ──────────────────────────────────── */
+.main-wrap {
+  margin-left: var(--sidebar-w);
+  padding-top: var(--topbar-h);
+  height: 100vh;
+  overflow-y: auto;
+}
+.main { padding: 24px; max-width: 1300px; }
+.panel { display: none; animation: fadeIn 0.2s ease; }
+.panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ─── STAT CARDS ────────────────────────────────────── */
+.stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 22px; }
+.stat-card {
+  background: white; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 18px 16px; position: relative; overflow: hidden; transition: box-shadow 0.15s;
+}
+.stat-card:hover { box-shadow: var(--shadow-md); }
+.stat-card::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.stat-card.c-blue::after { background: var(--accent); }
+.stat-card.c-green::after { background: var(--green); }
+.stat-card.c-amber::after { background: #d29922; }
+.stat-card.c-red::after { background: var(--red); }
+.stat-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.stat-val { font-size: 26px; font-weight: 700; font-family: 'Space Mono', monospace; }
+.stat-val.c-blue { color: var(--accent); }
+.stat-val.c-green { color: var(--green); }
+.stat-val.c-amber { color: #d29922; }
+.stat-val.c-red { color: var(--red); }
+.stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.stat-icon { position: absolute; right: 16px; top: 14px; font-size: 26px; opacity: 0.12; }
+
+/* ─── SECTION HEADER ────────────────────────────────── */
+.section-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+}
+.section-hdr h3 { font-size: 14px; font-weight: 700; }
+.filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: white; color: var(--muted);
+  transition: all 0.14s; white-space: nowrap;
+}
+.chip.active { background: var(--ink); color: white; border-color: var(--ink); }
+.chip:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+/* ─── CARD ──────────────────────────────────────────── */
+.card {
+  background: white; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 18px; box-shadow: var(--shadow-sm);
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-light);
+}
+.card-header h4 { font-size: 14px; font-weight: 700; }
+
+/* ─── FORM ──────────────────────────────────────────── */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; }
+.field label {
+  display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); margin-bottom: 6px;
+}
+.field input, .field select {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; color: var(--ink); background: white;
+  font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.14s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field input[readonly] { background: var(--surface); color: var(--muted); }
+
+.form-actions { display: flex; gap: 8px; margin-top: 16px; }
+.btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.14s; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-success { background: var(--green); color: white; }
+.btn-success:hover { filter: brightness(0.9); }
+.btn-ghost { background: white; border: 1px solid var(--border); color: var(--ink); }
+.btn-ghost:hover { background: var(--surface); }
+.btn-icon-sm {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid; font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.12s;
+}
+.btn-edit { background: var(--amber-bg); color: var(--amber); border-color: #f0c000; }
+.btn-edit:hover { background: #fef3c7; }
+.btn-del { background: var(--red-bg); color: var(--red); border-color: #ffc1c0; }
+.btn-del:hover { background: #ffe0de; }
+
+/* ─── TABLE ─────────────────────────────────────────── */
+.table-wrap {
+  background: white; border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; box-shadow: var(--shadow-sm); overflow-x: auto;
+}
+.data-table { width: 100%; border-collapse: collapse; min-width: 520px; }
+.data-table th {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--muted); padding: 10px 16px; background: var(--surface); text-align: left;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.data-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td { background: #fafbfc; }
+.data-table .actions { display: flex; gap: 6px; }
+
+/* ─── BADGES / PILLS ────────────────────────────────── */
+.kpi-badge {
+  display: inline-block; background: var(--accent-bg); color: var(--accent);
+  padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+}
+.status-pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
+  border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.status-pill::before { content: '●'; font-size: 7px; }
+.pill-green { background: var(--green-bg); color: var(--green); }
+.pill-amber { background: var(--amber-bg); color: var(--amber); }
+.pill-red { background: var(--red-bg); color: var(--red); }
+.pill-gray { background: #f1f3f5; color: var(--muted); }
+.thresh-pill {
+  font-size: 10px; padding: 2px 7px; border-radius: 5px; font-weight: 700;
+  color: white; margin-right: 3px;
+}
+
+/* ─── ADMIN BASE LISTS ──────────────────────────────── */
+.base-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px; border-bottom: 1px solid var(--border-light);
+  transition: background 0.12s;
+}
+.base-item:last-child { border-bottom: none; }
+.base-item:hover { background: var(--surface); }
+.base-item span { font-weight: 500; font-size: 13px; }
+.base-item .base-actions { display: flex; gap: 5px; }
+
+/* ─── MODAL ─────────────────────────────────────────── */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 500; align-items: center; justify-content: center; padding: 20px;
+  backdrop-filter: blur(3px);
+}
+.modal-backdrop.show { display: flex; }
+.modal {
+  background: white; border-radius: 14px; padding: 24px; width: 100%; max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2); animation: modalIn 0.2s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(-10px); } to { opacity: 1; transform: none; } }
+.modal h4 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.modal input { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: 'DM Sans', sans-serif; outline: none; }
+.modal input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+/* ─── NOTIFICATION TOAST ────────────────────────────── */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 600; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--ink); color: white; padding: 12px 18px; border-radius: 10px;
+  font-size: 13px; font-weight: 500; max-width: 300px; box-shadow: var(--shadow-md);
+  animation: toastIn 0.25s ease; display: flex; align-items: center; gap: 8px;
+}
+.toast.success { background: var(--green); }
+.toast.error { background: var(--red); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ─── EMPTY STATE ───────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 48px 20px; color: var(--muted);
+}
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+.empty-state p { font-size: 13px; }
+
+/* ─── LOADING ───────────────────────────────────────── */
+.loading-bar {
+  position: fixed; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent), #58a6ff); z-index: 999;
+  transform: scaleX(0); transform-origin: left; transition: transform 0.4s ease;
+}
+.loading-bar.active { transform: scaleX(1); }
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-md); }
+  .sidebar-close-btn { display: block; }
+  .main-wrap { margin-left: 0; height: 100vh; overflow-y: auto; }
+  .topbar { left: 0; }
+  .hamburger-btn { display: flex; align-items: center; justify-content: center; }
+  .search-box { width: 160px; }
+  .stats-row { grid-template-columns: repeat(2,1fr); }
+  .topbar-title span { display: none; }
+}
+@media (max-width: 600px) {
+  .main { padding: 14px; }
+  .stats-row { grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .search-box { display: none; }
+  .topbar { padding: 0 14px; }
+  .topbar-title { font-size: 14px; }
+  .card { padding: 14px; }
+  .form-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loading-bar"></div>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="brand">
+      <div class="brand-icon">CH</div>
+      <div>
+        <div class="brand-name">Camp Hub Pro</div>
+        <div class="brand-ver">MASTER v3.0</div>
+      </div>
+    </div>
+    <button class="sidebar-close-btn" onclick="closeSidebar()">✕</button>
+  </div>
+  <nav class="nav">
+    <div class="nav-group">
+      <span class="nav-group-label">Overview</span>
+      <button class="nav-btn active" onclick="showPanel('insight',this)">
+        <span class="nav-icon">📊</span> Insight
+      </button>
+    </div>
+    <div class="nav-group">
+      <span class="nav-group-label">Operations</span>
+      <button class="nav-btn" onclick="showPanel('update',this)">
+        <span class="nav-icon">📋</span> Daily Entry
+        <span class="nav-badge" id="today-badge">0</span>
+      </button>
+      <button class="nav-btn" onclick="showPanel('kpi-data',this)">
+        <span class="nav-icon">📈</span> KPI Performance
+      </button>
+    </div>
+    <div class="nav-group">
+      <span class="nav-group-label">Configuration</span>
+      <button class="nav-btn" onclick="showPanel('manage',this)">
+        <span class="nav-icon">🏗️</span> Facility Setup
+      </button>
+      <button class="nav-btn" onclick="showPanel('kpi-panel',this)">
+        <span class="nav-icon">🎯</span> KPI Assignment
+      </button>
+      <button class="nav-btn" onclick="showPanel('settings',this)">
+        <span class="nav-icon">⚙️</span> Admin Base
+      </button>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="avatar">A</div>
+    <div>
+      <div class="user-name">Administrator</div>
+      <div class="user-role">Super User</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ── TOPBAR ── -->
+<header class="topbar">
+  <button class="hamburger-btn" onclick="toggleSidebar()">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <rect x="2" y="5" width="16" height="1.8" rx="1" fill="currentColor"/>
+      <rect x="2" y="9.1" width="16" height="1.8" rx="1" fill="currentColor"/>
+      <rect x="2" y="13.2" width="16" height="1.8" rx="1" fill="currentColor"/>
+    </svg>
+  </button>
+  <div class="topbar-title" id="topbar-title">
+    Insight Overview <span>— Master View</span>
+  </div>
+  <div class="search-box" id="global-search-box">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input id="f-insight" placeholder="Search sites, facilities…" onkeyup="INSIGHT_FILTER='ALL'; renderInsight(); updateStats()">
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" title="Export CSV" onclick="exportCSV()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+    <button class="icon-btn" title="Notifications" id="notif-btn" onclick="showNotifications()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notif-dot" id="notif-dot" style="display:none"></span>
+    </button>
+    <button class="sync-btn" id="sync-btn" onclick="syncData()">
+      <span class="sync-icon" style="display:inline-block">↻</span> Sync
+    </button>
+  </div>
+</header>
+
+<!-- ── MAIN CONTENT ── -->
+<div class="main-wrap">
+<div class="main">
+
+  <!-- INSIGHT PANEL -->
+  <section id="insight" class="panel active">
+    <div class="stats-row">
+      <div class="stat-card c-blue">
+        <div class="stat-icon">🏕️</div>
+        <div class="stat-label">Active Sites</div>
+        <div class="stat-val c-blue" id="stat-sites">—</div>
+        <div class="stat-sub" id="stat-sites-sub">Registered locations</div>
+      </div>
+      <div class="stat-card c-green">
+        <div class="stat-icon">🏠</div>
+        <div class="stat-label">Avg Occupancy</div>
+        <div class="stat-val c-green" id="stat-occ">—</div>
+        <div class="stat-sub">Across accommodation</div>
+      </div>
+      <div class="stat-card c-amber">
+        <div class="stat-icon">💧</div>
+        <div class="stat-label">Facilities Mapped</div>
+        <div class="stat-val c-amber" id="stat-fac">—</div>
+        <div class="stat-sub">Total site-facility links</div>
+      </div>
+      <div class="stat-card c-red">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-label">KPI Alerts</div>
+        <div class="stat-val c-red" id="stat-alerts">—</div>
+        <div class="stat-sub">Below threshold</div>
+      </div>
+    </div>
+    <div class="section-hdr">
+      <h3>Facility Master View</h3>
+      <div id="insight-chips" class="filter-chips"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th>Site</th><th>Facility</th><th>Contractor</th><th>Spec</th><th>Last KPI Status</th>
+        </tr></thead>
+        <tbody id="insight-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- DAILY ENTRY PANEL -->
+  <section id="update" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h4 id="entry-title">Post Daily Log</h4>
+        <button class="btn btn-ghost" onclick="resetForm('entry')">Clear</button>
+      </div>
+      <input type="hidden" id="entry-id">
+      <div class="form-grid">
+        <div class="field"><label>Site</label><select id="entry-loc" onchange="syncEntryFacs()"></select></div>
+        <div class="field"><label>Facility</label><select id="entry-map" onchange="toggleEntryUI()"></select></div>
+      </div>
+      <div id="form-area" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-light);">
+        <div id="ui-acc" class="form-grid" style="display:none">
+          <div class="field"><label>Total Rooms</label><input type="number" id="in-rm" readonly></div>
+          <div class="field"><label>Occupied</label><input type="number" id="in-oc" placeholder="0"></div>
+          <div class="field"><label>Mandays</label><input type="number" id="in-md" placeholder="0"></div>
+        </div>
+        <div id="ui-plant" class="form-grid" style="display:none">
+          <div class="field"><label>Max Cap (m³)</label><input type="number" id="in-cap" readonly></div>
+          <div class="field"><label>Received</label><input type="number" id="in-rec" placeholder="0"></div>
+          <div class="field"><label>Treated</label><input type="number" id="in-tr" placeholder="0"></div>
+        </div>
+        <div class="form-actions">
+          <button id="entry-btn" class="btn btn-primary" onclick="saveDailyEntry()">Post Daily Record</button>
+        </div>
+      </div>
+    </div>
+    <div class="section-hdr">
+      <h3>Log History</h3>
+      <div id="log-filter-chips" class="filter-chips"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Site</th><th>Facility</th><th>Data</th><th>Actions</th></tr></thead>
+        <tbody id="entry-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- KPI PERFORMANCE PANEL -->
+  <section id="kpi-data" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h4 id="perf-title">Record KPI Performance</h4>
+        <button class="btn btn-ghost" onclick="resetForm('perf')">Clear</button>
+      </div>
+      <input type="hidden" id="perf-id">
+      <div class="form-grid">
+        <div class="field"><label>Site</label><select id="perf-loc" onchange="syncPerfCons()"></select></div>
+        <div class="field"><label>Contractor</label><select id="perf-con" onchange="syncPerfCodes()"></select></div>
+        <div class="field"><label>KPI Code</label><select id="perf-code"></select></div>
+        <div class="field"><label>Date</label><input type="date" id="perf-date"></div>
+        <div class="field"><label>Result Value</label><input type="number" step="0.01" id="perf-val" placeholder="0.00"></div>
+      </div>
+      <div class="form-actions">
+        <button id="perf-btn" class="btn btn-primary" onclick="saveKPIPerformance()">Submit Record</button>
+      </div>
+    </div>
+    <div class="section-hdr">
+      <h3>Performance Records</h3>
+      <div id="perf-filter-chips" class="filter-chips"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Site</th><th>Contractor</th><th>Code</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="perf-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FACILITY SETUP PANEL -->
+  <section id="manage" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h4 id="setup-title">Establish New Mapping</h4>
+        <button class="btn btn-ghost" onclick="resetSetupForm()">Clear</button>
+      </div>
+      <input type="hidden" id="setup-id">
+      <div class="form-grid">
+        <div class="field"><label>Site</label><select id="set-loc"></select></div>
+        <div class="field"><label>Facility Type</label><select id="set-fac" onchange="toggleSetupFields()"></select></div>
+        <div class="field"><label>Contractor</label><select id="set-con"></select></div>
+        <div class="field"><label>Prefix</label><input type="text" id="set-pre" placeholder="e.g. Block A"></div>
+      </div>
+      <div id="setup-acc" class="form-grid" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
+        <div class="field"><label>Blocks</label><input type="number" id="set-bl" placeholder="0"></div>
+        <div class="field"><label>Rooms</label><input type="number" id="set-rm" placeholder="0"></div>
+      </div>
+      <div id="setup-plant" class="form-grid" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); display:none;">
+        <div class="field"><label>Units</label><input type="number" id="set-units" placeholder="0"></div>
+        <div class="field"><label>Max Capacity (m³)</label><input type="number" id="set-cap" placeholder="0"></div>
+      </div>
+      <div class="form-actions">
+        <button id="setup-btn" class="btn btn-primary" onclick="saveSetup()">Create Assignment</button>
+      </div>
+    </div>
+    <div class="section-hdr">
+      <h3>Facility Mappings</h3>
+      <div id="manage-filter-chips" class="filter-chips"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Site</th><th>Facility</th><th>Contractor</th><th>Spec</th><th>Actions</th></tr></thead>
+        <tbody id="manage-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- KPI ASSIGNMENT PANEL -->
+  <section id="kpi-panel" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h4 id="kpi-title">Link KPI Assignment</h4>
+        <button class="btn btn-ghost" onclick="resetForm('kpi')">Clear</button>
+      </div>
+      <input type="hidden" id="kpi-id">
+      <div class="form-grid">
+        <div class="field"><label>Site</label><select id="kpi-loc" onchange="syncKpiCons()"></select></div>
+        <div class="field"><label>Contractor</label><select id="kpi-con"></select></div>
+        <div class="field"><label>KPI Code</label><input type="text" id="kpi-manual-code" placeholder="e.g. CLEAN-01"></div>
+      </div>
+      <div class="form-grid" style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
+        <div class="field">
+          <label style="color:var(--green)">Target (Green) ≥</label>
+          <input type="number" step="0.01" id="kpi-green" placeholder="e.g. 95">
+        </div>
+        <div class="field">
+          <label style="color:var(--amber)">Warning (Amber) ≥</label>
+          <input type="number" step="0.01" id="kpi-gray" placeholder="e.g. 90">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button id="kpi-btn" class="btn btn-primary" onclick="saveKPIAssignment()">Link KPI & Set Thresholds</button>
+      </div>
+    </div>
+    <div class="section-hdr">
+      <h3>KPI Assignments</h3>
+      <div id="kpi-filter-chips" class="filter-chips"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Site</th><th>Contractor</th><th>Code</th><th>Green ≥</th><th>Warning ≥</th><th>Actions</th></tr></thead>
+        <tbody id="kpi-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ADMIN BASE PANEL -->
+  <section id="settings" class="panel">
+    <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
+      <!-- Locations -->
+      <div class="card">
+        <div class="card-header"><h4>📍 Locations</h4></div>
+        <div class="form-actions" style="margin-top:0; margin-bottom:14px;">
+          <div class="field" style="flex:1; margin:0;"><input type="text" id="b-loc" placeholder="New location name…"></div>
+          <button class="btn btn-primary" onclick="addBase('locations','name','b-loc')" style="padding:8px 14px; flex-shrink:0;">+ Add</button>
+        </div>
+        <div id="l-list"></div>
+      </div>
+      <!-- Contractors -->
+      <div class="card">
+        <div class="card-header"><h4>🤝 Contractors</h4></div>
+        <div class="form-actions" style="margin-top:0; margin-bottom:14px;">
+          <div class="field" style="flex:1; margin:0;"><input type="text" id="b-con" placeholder="New contractor name…"></div>
+          <button class="btn btn-primary" onclick="addBase('contractors','name','b-con')" style="padding:8px 14px; flex-shrink:0;">+ Add</button>
+        </div>
+        <div id="c-list"></div>
+      </div>
+      <!-- Facility Types -->
+      <div class="card">
+        <div class="card-header"><h4>🏗️ Facility Types</h4></div>
+        <div class="form-actions" style="margin-top:0; margin-bottom:14px;">
+          <div class="field" style="flex:1; margin:0;"><input type="text" id="b-fac" placeholder="New facility type…"></div>
+          <button class="btn btn-primary" onclick="addBase('facilities','facility_type','b-fac')" style="padding:8px 14px; flex-shrink:0;">+ Add</button>
+        </div>
+        <div id="f-list"></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<!-- MODAL: RENAME -->
+<div class="modal-backdrop" id="rename-modal">
+  <div class="modal">
+    <h4>Rename Item</h4>
+    <input type="text" id="rename-input" placeholder="Enter new name…">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('rename-modal')">Cancel</button>
+      <button class="btn btn-primary" id="rename-confirm-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DELETE CONFIRM -->
+<div class="modal-backdrop" id="delete-modal">
+  <div class="modal">
+    <h4>Confirm Delete</h4>
+    <p style="font-size:14px; color:var(--muted); margin-top:8px;">This action cannot be undone. Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('delete-modal')">Cancel</button>
+      <button class="btn" style="background:var(--red);color:white;" id="delete-confirm-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ── CONFIG ──
+const SB_URL = 'https://lkufyubfipdaxbjdyodg.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxrdWZ5dWJmaXBkYXhiamR5b2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNTE5MDIsImV4cCI6MjA4NTYyNzkwMn0.2wUNKYNnoAz4zguIhHAAFfqnzVeZWEDEteKsNxFcYa8';
+const db = supabase.createClient(SB_URL, SB_KEY);
+let CACHE = { locs:[], types:[], cons:[], mapping:[], kpis:[], performance:[], logs:[] };
+let FILTERS = { update:'ALL', 'kpi-data':'ALL', manage:'ALL', 'kpi-panel':'ALL' };
+let ACTIVE_LOG_FILTER = 'ALL';
+let INSIGHT_FILTER = 'ALL';
+const PANEL_TITLES = {
+  insight: 'Insight Overview — Master View',
+  update: 'Daily Entry — Log Operations',
+  'kpi-data': 'KPI Performance — Records',
+  manage: 'Facility Setup — Mapping',
+  'kpi-panel': 'KPI Assignment — Thresholds',
+  settings: 'Admin Base — Configuration'
+};
+
+// ── INIT ──
+window.onload = () => init();
+
+async function init() {
+  setLoading(true);
+  const [l,t,c,m,k,p,d] = await Promise.all([
+    db.from('locations').select('*').order('name'),
+    db.from('facilities').select('*').order('facility_type'),
+    db.from('contractors').select('*').order('name'),
+    db.from('facility_locations').select('*, locations(name), facilities(facility_type), contractors(name)'),
+    db.from('contractor_kpis').select('*, locations(name), contractors(name)'),
+    db.from('kpi_performance').select('*, contractor_kpis(*), contractors(name), locations(name)').order('entry_date', {ascending:false}),
+    db.from('facility_data').select('*').order('updated_at', {ascending:false})
+  ]);
+  CACHE = {
+    locs: l.data||[], types: t.data||[], cons: c.data||[],
+    mapping: m.data||[], kpis: k.data||[], performance: p.data||[], logs: d.data||[]
+  };
+  renderAll();
+  setLoading(false);
+  updateStats();
+  updateTodayBadge();
+}
+
+function renderAll() {
+  renderInsight(); populateDrops();
+  renderPerfTable(); renderManage(); renderKpiAssignments(); renderBase();
+  renderLogFilters(); renderEntryTable();
+  renderFilterChips('update', 'logs', ACTIVE_LOG_FILTER);
+  renderFilterChips('kpi-data', 'performance', FILTERS['kpi-data']);
+  renderFilterChips('manage', 'mapping', FILTERS['manage']);
+  renderFilterChips('kpi-panel', 'kpis', FILTERS['kpi-panel']);
+}
+
+// ── STATS ──
+function updateStats() {
+  const filteredMapping = INSIGHT_FILTER === 'ALL'
+    ? CACHE.mapping
+    : CACHE.mapping.filter(m => m.locations?.name === INSIGHT_FILTER);
+  const filteredLocIds = [...new Set(filteredMapping.map(m => m.location_id))];
+  const filteredMappingIds = new Set(filteredMapping.map(m => m.id));
+
+  document.getElementById('stat-sites').textContent = INSIGHT_FILTER === 'ALL' ? CACHE.locs.length : filteredLocIds.length;
+  document.getElementById('stat-fac').textContent = filteredMapping.length;
+  if (document.getElementById('stat-sites-sub')) {
+    document.getElementById('stat-sites-sub').textContent = INSIGHT_FILTER === 'ALL' ? 'All registered locations' : `Filtered: ${INSIGHT_FILTER}`;
+  }
+
+  const accLogs = CACHE.logs.filter(l => {
+    const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+    return m && filteredMappingIds.has(m.id) && !m.facilities?.facility_type?.toUpperCase().match(/STP|RO/);
+  });
+  if (accLogs.length) {
+    const rates = accLogs.map(l => {
+      const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+      return m?.total_rooms ? (l.occ_rooms / m.total_rooms * 100) : null;
+    }).filter(r => r !== null);
+    const avg = rates.length ? (rates.reduce((a,b) => a+b, 0) / rates.length) : 0;
+    document.getElementById('stat-occ').textContent = avg.toFixed(1) + '%';
+  } else {
+    document.getElementById('stat-occ').textContent = 'N/A';
+  }
+
+  // Card 4: KPI Alerts scoped to filtered locations
+  const alerts = CACHE.performance.filter(p => {
+    const k = p.contractor_kpis;
+    const inScope = INSIGHT_FILTER === 'ALL' || filteredLocIds.includes(p.location_id || k?.location_id);
+    return inScope && k && k.gray_threshold && p.actual_value < k.gray_threshold;
+  });
+  document.getElementById('stat-alerts').textContent = alerts.length;
+  document.getElementById('notif-dot').style.display = alerts.length ? 'block' : 'none';
+}
+
+function updateTodayBadge() {
+  const today = new Date().toISOString().slice(0,10);
+  const count = CACHE.logs.filter(l => l.updated_at?.startsWith(today)).length;
+  document.getElementById('today-badge').textContent = count;
+}
+
+// ── NAVIGATION ──
+function showPanel(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('topbar-title').innerHTML = PANEL_TITLES[id] || id;
+  if (window.innerWidth < 900) closeSidebar();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+// ── LOADING ──
+function setLoading(on) {
+  const btn = document.getElementById('sync-btn');
+  document.getElementById('loading-bar').classList.toggle('active', on);
+  if (on) { btn.querySelector('.sync-icon').style.animation = 'spin 1s linear infinite'; }
+  else { btn.querySelector('.sync-icon').style.animation = ''; }
+}
+
+async function syncData() {
+  setLoading(true);
+  await init();
+  toast('Data synced successfully', 'success');
+}
+
+// ── TOAST ──
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = (type === 'success' ? '✓ ' : type === 'error' ? '✕ ' : '') + msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ── MODAL ──
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ── FILTER CHIPS ──
+function renderFilterChips(panelId, cacheKey, activeVal) {
+  const containerId = panelId === 'update' ? 'log-filter-chips' :
+    panelId === 'kpi-data' ? 'perf-filter-chips' :
+    panelId === 'manage' ? 'manage-filter-chips' : 'kpi-filter-chips';
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const counts = {};
+  CACHE[cacheKey].forEach(item => {
+    const loc = item.locations?.name || 'Unknown';
+    counts[loc] = (counts[loc]||0) + 1;
+  });
+  const total = CACHE[cacheKey].length;
+  let html = `<span class="chip ${activeVal==='ALL'?'active':''}" onclick="applyFilter('${panelId}','ALL','${cacheKey}')">All (${total})</span>`;
+  Object.keys(counts).sort().forEach(loc => {
+    html += `<span class="chip ${activeVal===loc?'active':''}" onclick="applyFilter('${panelId}','${loc}','${cacheKey}')">${loc} (${counts[loc]})</span>`;
+  });
+  container.innerHTML = html;
+}
+
+function applyFilter(panelId, loc, cacheKey) {
+  if (panelId === 'update') { ACTIVE_LOG_FILTER = loc; renderLogFilters(); renderEntryTable(); }
+  else { FILTERS[panelId] = loc; init(); }
+}
+
+// ── INSIGHT ──
+function setInsightFilter(site) {
+  INSIGHT_FILTER = site;
+  renderInsight();
+  updateStats();
+}
+
+function renderInsight() {
+  const f = document.getElementById('f-insight').value.toLowerCase();
+
+  // Filter by search text AND active site chip
+  const data = CACHE.mapping.filter(m => {
+    const matchSearch = !f || m.locations?.name.toLowerCase().includes(f) ||
+      m.prefix_name?.toLowerCase().includes(f) ||
+      m.facilities?.facility_type?.toLowerCase().includes(f) ||
+      m.contractors?.name?.toLowerCase().includes(f);
+    const matchSite = INSIGHT_FILTER === 'ALL' || m.locations?.name === INSIGHT_FILTER;
+    return matchSearch && matchSite;
+  });
+
+  // Rebuild site filter chips
+  const siteChips = document.getElementById('insight-chips');
+  if (siteChips) {
+    const counts = {};
+    CACHE.mapping.forEach(m => { const n = m.locations?.name||'?'; counts[n]=(counts[n]||0)+1; });
+    let ch = `<span class="chip ${INSIGHT_FILTER==='ALL'?'active':''}" onclick="setInsightFilter('ALL')">All (${CACHE.mapping.length})</span>`;
+    Object.keys(counts).sort().forEach(s => {
+      ch += `<span class="chip ${INSIGHT_FILTER===s?'active':''}" onclick="setInsightFilter('${s}')">${s} (${counts[s]})</span>`;
+    });
+    siteChips.innerHTML = ch;
+  }
+
+  document.getElementById('insight-body').innerHTML = data.length
+    ? data.map(m => {
+        const spec = m.total_rooms ? `${m.total_rooms} rooms` : m.max_capacity ? `${m.max_capacity} m³` : '—';
+        const relPerf = CACHE.performance.filter(p => p.contractor_kpis?.location_id === m.location_id && p.contractor_id === m.contractor_id);
+        let statusHtml = '<span class="status-pill pill-gray">No Data</span>';
+        if (relPerf.length) {
+          const latest = relPerf[0]; const k = latest.contractor_kpis;
+          if (k?.green_threshold && latest.actual_value >= k.green_threshold) statusHtml = '<span class="status-pill pill-green">On Target</span>';
+          else if (k?.gray_threshold && latest.actual_value >= k.gray_threshold) statusHtml = '<span class="status-pill pill-amber">Warning</span>';
+          else if (k) statusHtml = '<span class="status-pill pill-red">Below Target</span>';
+        }
+        return `<tr>
+          <td><strong>${m.locations?.name}</strong></td>
+          <td>${m.prefix_name} ${m.facilities?.facility_type}</td>
+          <td>${m.contractors?.name||'<span style="color:var(--muted);font-style:italic">Internal</span>'}</td>
+          <td style="font-family:'Space Mono',monospace;font-size:12px;">${spec}</td>
+          <td>${statusHtml}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🔍</div><p>No facilities found</p></div></td></tr>`;
+}
+
+// ── DAILY ENTRY ──
+function syncEntryFacs() {
+  const lid = document.getElementById('entry-loc').value;
+  const filtered = CACHE.mapping.filter(m => m.location_id === lid);
+  document.getElementById('entry-map').innerHTML = '<option value="">— Select Facility —</option>' + filtered.map(m => `<option value="${m.id}">${m.prefix_name} ${m.facilities.facility_type}</option>`).join('');
+}
+function toggleEntryUI() {
+  const m = CACHE.mapping.find(x => x.id == document.getElementById('entry-map').value);
+  if(!m) return;
+  const isP = m.facilities.facility_type.toUpperCase().match(/STP|RO/);
+  document.getElementById('form-area').style.display = 'block';
+  document.getElementById('ui-acc').style.display = isP?'none':'grid';
+  document.getElementById('ui-plant').style.display = isP?'grid':'none';
+  if(isP) document.getElementById('in-cap').value = m.max_capacity;
+  else document.getElementById('in-rm').value = m.total_rooms;
+}
+async function saveDailyEntry() {
+  const id = document.getElementById('entry-id').value;
+  const mid = document.getElementById('entry-map').value;
+  const m = CACHE.mapping.find(x => x.id == mid);
+  const data = { fac_loc_id: mid };
+  if(m.facilities.facility_type.toUpperCase().match(/STP|RO/)) {
+    data.water_rec = parseFloat(document.getElementById('in-rec').value)||0;
+    data.water_treat = parseFloat(document.getElementById('in-tr').value)||0;
+    data.occ_rooms = null; data.mandays = null;
+  } else {
+    data.occ_rooms = parseInt(document.getElementById('in-oc').value)||0;
+    data.mandays = parseInt(document.getElementById('in-md').value)||0;
+    data.water_rec = null; data.water_treat = null;
+  }
+  const { error } = id
+    ? await db.from('facility_data').update(data).eq('id', id)
+    : await db.from('facility_data').insert([data]);
+  if(!error) { resetForm('entry'); init(); toast('Daily log posted', 'success'); }
+  else { toast(error.message, 'error'); }
+}
+function editEntry(id) {
+  const l = CACHE.logs.find(x => x.id === id);
+  document.getElementById('entry-id').value = l.id;
+  const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+  if(m) {
+    document.getElementById('entry-loc').value = m.location_id;
+    syncEntryFacs();
+    document.getElementById('entry-map').value = l.fac_loc_id;
+    toggleEntryUI();
+    document.getElementById('in-oc').value = l.occ_rooms||'';
+    document.getElementById('in-md').value = l.mandays||'';
+    document.getElementById('in-rec').value = l.water_rec||'';
+    document.getElementById('in-tr').value = l.water_treat||'';
+  }
+  setMode('entry','upd');
+}
+
+function renderLogFilters() {
+  const counts = {}; let total = 0;
+  CACHE.logs.forEach(l => {
+    const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+    const loc = m?.locations?.name || 'Unknown';
+    counts[loc] = (counts[loc]||0)+1; total++;
+  });
+  const container = document.getElementById('log-filter-chips');
+  if(!container) return;
+  let html = `<span class="chip ${ACTIVE_LOG_FILTER==='ALL'?'active':''}" onclick="setLogFilter('ALL')">All (${total})</span>`;
+  Object.keys(counts).sort().forEach(loc => {
+    html += `<span class="chip ${ACTIVE_LOG_FILTER===loc?'active':''}" onclick="setLogFilter('${loc}')">${loc} (${counts[loc]})</span>`;
+  });
+  container.innerHTML = html;
+}
+function setLogFilter(loc) { ACTIVE_LOG_FILTER = loc; renderLogFilters(); renderEntryTable(); }
+function renderEntryTable() {
+  const filtered = ACTIVE_LOG_FILTER === 'ALL' ? CACHE.logs : CACHE.logs.filter(l => {
+    const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+    return m?.locations?.name === ACTIVE_LOG_FILTER;
+  });
+  document.getElementById('entry-body').innerHTML = filtered.length
+    ? filtered.map(l => {
+        const m = CACHE.mapping.find(x => x.id === l.fac_loc_id);
+        const fac = m ? `${m.prefix_name} ${m.facilities?.facility_type}` : '—';
+        const site = m?.locations?.name || '—';
+        const dateStr = l.updated_at ? new Date(l.updated_at).toLocaleDateString('en-GB') : '—';
+        const dataStr = l.occ_rooms != null
+          ? `Occ: ${l.occ_rooms} / MD: ${l.mandays}`
+          : `Recv: ${l.water_rec} / Treat: ${l.water_treat}`;
+        return `<tr>
+          <td style="font-family:'Space Mono',monospace;font-size:12px;">${dateStr}</td>
+          <td>${site}</td>
+          <td>${fac}</td>
+          <td style="color:var(--muted);font-size:12px;">${dataStr}</td>
+          <td><div class="actions">
+            <button class="btn-icon-sm btn-edit" onclick="editEntry('${l.id}')">Edit</button>
+            <button class="btn-icon-sm btn-del" onclick="confirmDelete('facility_data','${l.id}')">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📋</div><p>No logs found</p></div></td></tr>`;
+}
+
+// ── KPI PERFORMANCE ──
+async function saveKPIPerformance() {
+  const id = document.getElementById('perf-id').value;
+  const data = {
+    location_id: document.getElementById('perf-loc').value,
+    kpi_assignment_id: document.getElementById('perf-code').value,
+    contractor_id: document.getElementById('perf-con').value,
+    entry_date: document.getElementById('perf-date').value,
+    actual_value: parseFloat(document.getElementById('perf-val').value)
+  };
+  const { error } = id
+    ? await db.from('kpi_performance').update(data).eq('id', id)
+    : await db.from('kpi_performance').insert([data]);
+  if(!error) { resetForm('perf'); init(); toast('KPI performance recorded', 'success'); }
+  else { toast(error.message, 'error'); }
+}
+function editPerf(id) {
+  const p = CACHE.performance.find(x => x.id === id);
+  document.getElementById('perf-id').value = p.id;
+  document.getElementById('perf-loc').value = p.location_id || p.contractor_kpis?.location_id;
+  syncPerfCons(); document.getElementById('perf-con').value = p.contractor_id;
+  syncPerfCodes(); document.getElementById('perf-code').value = p.kpi_assignment_id;
+  document.getElementById('perf-date').value = p.entry_date;
+  document.getElementById('perf-val').value = p.actual_value;
+  setMode('perf','upd');
+}
+function syncPerfCons() {
+  const lid = document.getElementById('perf-loc').value;
+  const ids = [...new Set(CACHE.kpis.filter(k => k.location_id===lid).map(k => k.contractor_id))];
+  document.getElementById('perf-con').innerHTML = '<option value="">— Contractor —</option>' + CACHE.cons.filter(c => ids.includes(c.id)).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+}
+function syncPerfCodes() {
+  const lid = document.getElementById('perf-loc').value, cid = document.getElementById('perf-con').value;
+  document.getElementById('perf-code').innerHTML = CACHE.kpis.filter(k => k.location_id===lid && k.contractor_id===cid).map(k => `<option value="${k.id}">${k.kpi_code}</option>`).join('');
+}
+function renderPerfTable() {
+  const filtered = CACHE.performance.filter(p => FILTERS['kpi-data']==='ALL' || p.locations?.name===FILTERS['kpi-data']);
+  document.getElementById('perf-body').innerHTML = filtered.length
+    ? filtered.map(p => {
+        const k = p.contractor_kpis;
+        let statusHtml = '';
+        if(k?.green_threshold) {
+          if(p.actual_value >= k.green_threshold) statusHtml = '<span class="status-pill pill-green">On Target</span>';
+          else if(p.actual_value >= k.gray_threshold) statusHtml = '<span class="status-pill pill-amber">Warning</span>';
+          else statusHtml = '<span class="status-pill pill-red">Below Target</span>';
+        }
+        return `<tr>
+          <td style="font-family:'Space Mono',monospace;font-size:12px;">${p.entry_date}</td>
+          <td>${p.locations?.name||'—'}</td>
+          <td>${p.contractors?.name||'—'}</td>
+          <td><span class="kpi-badge">${k?.kpi_code||'—'}</span></td>
+          <td style="font-weight:600;font-family:'Space Mono',monospace;">${p.actual_value}</td>
+          <td>${statusHtml}</td>
+          <td><div class="actions">
+            <button class="btn-icon-sm btn-edit" onclick="editPerf('${p.id}')">Edit</button>
+            <button class="btn-icon-sm btn-del" onclick="confirmDelete('kpi_performance','${p.id}')">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📈</div><p>No performance records</p></div></td></tr>`;
+}
+
+// ── SETUP ──
+async function saveSetup() {
+  const id = document.getElementById('setup-id').value;
+  const locId = document.getElementById('set-loc').value;
+  const facId = document.getElementById('set-fac').value;
+  const conId = document.getElementById('set-con').value;
+  const selectedFac = CACHE.types.find(f => f.id === facId);
+  const isAcc = selectedFac?.facility_type.toUpperCase().includes('ACCOMMODATION');
+  if(!locId||!facId) { toast('Please select a Site and Facility Type', 'error'); return; }
+  if(!isAcc && !conId) { toast('Contractor is required for this facility type', 'error'); return; }
+  const data = {
+    location_id: locId, facility_id: facId, contractor_id: conId||null,
+    prefix_name: document.getElementById('set-pre').value,
+    num_blocks: parseInt(document.getElementById('set-bl').value)||0,
+    total_rooms: parseInt(document.getElementById('set-rm').value)||0,
+    max_capacity: parseInt(document.getElementById('set-cap').value)||0
+  };
+  const { error } = id
+    ? await db.from('facility_locations').update(data).eq('id', id)
+    : await db.from('facility_locations').insert([data]);
+  if(!error) { resetSetupForm(); init(); toast('Facility mapping saved', 'success'); }
+  else { toast(error.message, 'error'); }
+}
+function editSetup(id) {
+  const m = CACHE.mapping.find(x => x.id===id);
+  document.getElementById('setup-id').value = m.id;
+  document.getElementById('set-loc').value = m.location_id;
+  document.getElementById('set-fac').value = m.facility_id;
+  document.getElementById('set-con').value = m.contractor_id||'';
+  document.getElementById('set-pre').value = m.prefix_name;
+  toggleSetupFields();
+  document.getElementById('set-bl').value = m.num_blocks;
+  document.getElementById('set-rm').value = m.total_rooms;
+  document.getElementById('set-cap').value = m.max_capacity;
+  setMode('setup','upd');
+}
+function renderManage() {
+  const filtered = CACHE.mapping.filter(m => FILTERS['manage']==='ALL' || m.locations?.name===FILTERS['manage']);
+  document.getElementById('manage-body').innerHTML = filtered.length
+    ? filtered.map(m => {
+        const spec = m.total_rooms ? `${m.total_rooms} rooms` : m.max_capacity ? `${m.max_capacity} m³` : '—';
+        const con = m.contractors?.name || '<span style="color:var(--muted);font-style:italic">Internal</span>';
+        return `<tr>
+          <td>${m.locations?.name}</td>
+          <td>${m.prefix_name} ${m.facilities?.facility_type}</td>
+          <td>${con}</td>
+          <td style="font-size:12px;color:var(--muted)">${spec}</td>
+          <td><div class="actions">
+            <button class="btn-icon-sm btn-edit" onclick="editSetup('${m.id}')">Edit</button>
+            <button class="btn-icon-sm btn-del" onclick="confirmDelete('facility_locations','${m.id}')">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🏗️</div><p>No mappings found</p></div></td></tr>`;
+}
+function toggleSetupFields() {
+  const t = CACHE.types.find(x => x.id==document.getElementById('set-fac').value)?.facility_type.toUpperCase()||'';
+  const isP = t.includes('STP')||t.includes('RO');
+  document.getElementById('setup-acc').style.display = isP?'none':'grid';
+  document.getElementById('setup-plant').style.display = isP?'grid':'none';
+}
+function resetSetupForm() {
+  document.getElementById('setup-id').value = '';
+  ['set-loc','set-fac','set-con'].forEach(id => document.getElementById(id).selectedIndex=0);
+  ['set-pre','set-bl','set-rm','set-cap','set-units'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('setup-title').textContent = 'Establish New Mapping';
+  document.getElementById('setup-btn').textContent = 'Create Assignment';
+  document.getElementById('setup-btn').className = 'btn btn-primary';
+}
+
+// ── KPI ASSIGNMENT ──
+async function saveKPIAssignment() {
+  const id = document.getElementById('kpi-id').value;
+  const data = {
+    location_id: document.getElementById('kpi-loc').value,
+    contractor_id: document.getElementById('kpi-con').value,
+    kpi_code: document.getElementById('kpi-manual-code').value,
+    green_threshold: parseFloat(document.getElementById('kpi-green').value)||0,
+    gray_threshold: parseFloat(document.getElementById('kpi-gray').value)||0
+  };
+  const { error } = id
+    ? await db.from('contractor_kpis').update(data).eq('id', id)
+    : await db.from('contractor_kpis').insert([data]);
+  if(!error) { resetForm('kpi'); init(); toast('KPI assignment saved', 'success'); }
+  else { toast(error.message, 'error'); }
+}
+function editKpi(id) {
+  const k = CACHE.kpis.find(x => x.id===id);
+  document.getElementById('kpi-id').value = k.id;
+  document.getElementById('kpi-loc').value = k.location_id;
+  syncKpiCons();
+  document.getElementById('kpi-con').value = k.contractor_id;
+  document.getElementById('kpi-manual-code').value = k.kpi_code;
+  document.getElementById('kpi-green').value = k.green_threshold;
+  document.getElementById('kpi-gray').value = k.gray_threshold;
+  setMode('kpi','upd');
+}
+function syncKpiCons() {
+  const lid = document.getElementById('kpi-loc').value;
+  if(!lid) { document.getElementById('kpi-con').innerHTML = '<option value="">— Select Site First —</option>'; return; }
+  const ids = [...new Set(CACHE.mapping.filter(m => m.location_id===lid && m.contractor_id).map(m => m.contractor_id))];
+  const cons = CACHE.cons.filter(c => ids.includes(c.id));
+  document.getElementById('kpi-con').innerHTML = cons.length
+    ? '<option value="">— Select Contractor —</option>' + cons.map(c => `<option value="${c.id}">${c.name}</option>`).join('')
+    : '<option value="">No contractors at this site</option>';
+}
+function renderKpiAssignments() {
+  const filtered = CACHE.kpis.filter(m => FILTERS['kpi-panel']==='ALL' || m.locations?.name===FILTERS['kpi-panel']);
+  document.getElementById('kpi-body').innerHTML = filtered.length
+    ? filtered.map(k => `<tr>
+        <td>${k.locations?.name}</td>
+        <td>${k.contractors?.name}</td>
+        <td><span class="kpi-badge">${k.kpi_code}</span></td>
+        <td><span class="thresh-pill" style="background:var(--green)">${k.green_threshold}</span></td>
+        <td><span class="thresh-pill" style="background:var(--amber)">${k.gray_threshold}</span></td>
+        <td><div class="actions">
+          <button class="btn-icon-sm btn-edit" onclick="editKpi('${k.id}')">Edit</button>
+          <button class="btn-icon-sm btn-del" onclick="confirmDelete('contractor_kpis','${k.id}')">Delete</button>
+        </div></td>
+      </tr>`).join('')
+    : `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🎯</div><p>No KPI assignments</p></div></td></tr>`;
+}
+
+// ── ADMIN BASE ──
+async function addBase(t, c, i) {
+  const v = document.getElementById(i).value.trim();
+  if(v) { const { error } = await db.from(t).insert([{[c]:v}]); if(!error) { document.getElementById(i).value=''; init(); toast(`Added: ${v}`, 'success'); } else toast(error.message, 'error'); }
+}
+function editBase(table, column, id, oldName) {
+  const modal = document.getElementById('rename-modal');
+  document.getElementById('rename-input').value = oldName;
+  openModal('rename-modal');
+  document.getElementById('rename-confirm-btn').onclick = async () => {
+    const newName = document.getElementById('rename-input').value.trim();
+    if(newName && newName !== oldName) {
+      const { error } = await db.from(table).update({[column]: newName}).eq('id', id);
+      closeModal('rename-modal');
+      if(!error) { init(); toast('Renamed successfully', 'success'); } else toast(error.message, 'error');
+    } else { closeModal('rename-modal'); }
+  };
+}
+function renderBase() {
+  const draw = (list, table, col) => list.length
+    ? list.map(i => `<div class="base-item">
+        <span>${i[col]}</span>
+        <div class="base-actions">
+          <button class="btn-icon-sm btn-edit" onclick="editBase('${table}','${col}','${i.id}','${i[col]}')">Edit</button>
+          <button class="btn-icon-sm btn-del" onclick="confirmDelete('${table}','${i.id}')">Delete</button>
+        </div>
+      </div>`).join('')
+    : '<p style="padding:12px;font-size:13px;color:var(--muted)">No items yet</p>';
+  document.getElementById('l-list').innerHTML = draw(CACHE.locs,'locations','name');
+  document.getElementById('c-list').innerHTML = draw(CACHE.cons,'contractors','name');
+  document.getElementById('f-list').innerHTML = draw(CACHE.types,'facilities','facility_type');
+}
+
+// ── DELETE (MODAL) ──
+function confirmDelete(table, id) {
+  openModal('delete-modal');
+  document.getElementById('delete-confirm-btn').onclick = async () => {
+    const { error } = await db.from(table).delete().eq('id', id);
+    closeModal('delete-modal');
+    if(!error) { init(); toast('Deleted', 'success'); } else toast(error.message, 'error');
+  };
+}
+
+// ── DROPDOWNS ──
+function populateDrops() {
+  const dr = (l, k) => l.map(i => `<option value="${i.id}">${i[k]}</option>`).join('');
+  ['entry-loc','perf-loc','set-loc','kpi-loc'].forEach(id => {
+    document.getElementById(id).innerHTML = '<option value="">— Site —</option>' + dr(CACHE.locs,'name');
+  });
+  document.getElementById('set-fac').innerHTML = '<option value="">— Type —</option>' + dr(CACHE.types,'facility_type');
+  document.getElementById('set-con').innerHTML = '<option value="">— Contractor —</option>' + dr(CACHE.cons,'name');
+  document.getElementById('kpi-con').innerHTML = '<option value="">— Select Site First —</option>';
+}
+
+// ── FORM UTILS ──
+function setMode(p, m) {
+  const map = {
+    entry: ['entry-btn','entry-title'],
+    perf: ['perf-btn','perf-title'],
+    setup: ['setup-btn','setup-title'],
+    kpi: ['kpi-btn','kpi-title']
+  };
+  if(!map[p]) return;
+  const [btnId, titleId] = map[p];
+  const btn = document.getElementById(btnId);
+  const title = document.getElementById(titleId);
+  if(m === 'upd') {
+    btn.textContent = 'Update Record'; btn.className = 'btn btn-success';
+    title.textContent = 'Edit Record';
+  } else {
+    btn.className = 'btn btn-primary';
+    if(p==='entry') { btn.textContent = 'Post Daily Record'; title.textContent = 'Post Daily Log'; }
+    if(p==='perf') { btn.textContent = 'Submit Record'; title.textContent = 'Record KPI Performance'; }
+    if(p==='kpi') { btn.textContent = 'Link KPI & Set Thresholds'; title.textContent = 'Link KPI Assignment'; }
+  }
+}
+function resetForm(p) {
+  if(document.getElementById(p+'-id')) document.getElementById(p+'-id').value='';
+  if(p==='entry') {
+    document.getElementById('form-area').style.display='none';
+    ['in-oc','in-md','in-rec','in-tr'].forEach(id => document.getElementById(id).value='');
+  }
+  if(p==='kpi') { ['kpi-green','kpi-gray','kpi-manual-code'].forEach(id => document.getElementById(id).value=''); }
+  if(p==='perf') { ['perf-val','perf-date'].forEach(id => document.getElementById(id).value=''); }
+  setMode(p,'add');
+}
+
+// ── EXPORT CSV ──
+function exportCSV() {
+  const panel = document.querySelector('.panel.active');
+  const table = panel?.querySelector('.data-table');
+  if(!table) { toast('Nothing to export', ''); return; }
+  const rows = [];
+  table.querySelectorAll('tr').forEach(r => {
+    const cells = [...r.querySelectorAll('th,td')].map(c => `"${c.innerText.replace(/"/g,'""')}"`);
+    rows.push(cells.join(','));
+  });
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'camp-hub-export.csv'; a.click();
+  toast('Export downloaded', 'success');
+}
+
+// ── NOTIFICATIONS ──
+function showNotifications() {
+  const alerts = CACHE.performance.filter(p => {
+    const k = p.contractor_kpis;
+    return k && k.gray_threshold && p.actual_value < k.gray_threshold;
+  });
+  if(!alerts.length) { toast('No active alerts ✓', 'success'); return; }
+  alerts.slice(0,3).forEach(p => {
+    toast(`Alert: ${p.locations?.name} — ${p.contractor_kpis?.kpi_code} (${p.actual_value})`, 'error');
+  });
+}
+</script>
+</body>
+</html>
